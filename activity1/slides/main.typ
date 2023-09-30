@@ -42,8 +42,14 @@
         "1, 2": [busca local],
         "3-": highlight[busca local]
     )) que tentam encontrar uma solução ótima para um problema de otimização combinatória.
-    #only("2-")[\ O que isso significa? 
-    #align(center)[#image("../assets/🤔❔.png", height: 35%)]]
+    #only("2-")[\O que isso significa? 
+        #align(center)[
+            #alternatives-match((
+                "2": [#image("../assets/🤔❔.png", height: 5.1cm)],
+                "3-": [#image("../assets/🧐.png", height: 5.1cm)],
+            ))
+        ]
+    ]
 ]
 
 #slide(title: [Local Search $dot$ Vizinhança])[
@@ -56,7 +62,7 @@
     ]
 ]
 
-#slide(title: "Passo-a-passo")[
+#slide(title: "Passo-a-passo (Linguagem natural)")[
     + Escolha uma solução inicial; #pause \ #uncover("4-")[`loop {`]
     + Defina vizinhos da solução atual e suas distâncias; #pause
     + Solução atual $<-$ melhor dos vizinhos; #pause \ #uncover("4-")[`}`]
@@ -72,7 +78,7 @@
 #slide[
     #align(center)[
         #image("../assets/hill_climbing.png",
-        alt: "Function graph describing local search's points of interest",
+        alt: "Gráfica de uma função com descrição dos pontos de interesse da busca local",
         height: 7.75cm,
         )]
     #footnote[Fonte: https://wikidocs.net/189098, data de acesso: 2023-09-28]
@@ -90,9 +96,15 @@
     #guided_local_search_introduction
 ]
 
-// GLS history
-// Talk about GENET and such
-// http://www.bracil.net/CSP/gls.html
+#slide[
+    #align(center)[
+        #image("../assets/🛑.png")
+    ]
+]
+
+#slide(title: "História do Guided Local Search")[
+    // TODO
+]
 
 #slide(title: [Retomando...])[#guided_local_search_introduction]
 
@@ -106,7 +118,7 @@
 
 #slide[
     $ g(s) = f(s) + lambda a sum_(1<=i<=m) I_i(s) p_i $
-    / $g(s)$: Função de custo aumentada
+    / $g(s)$: Função de objetivo aumentada
     / $f(s)$: Função objetiva original
     / $I_i$: Função indicadora
     / $p_i$: Penalidade da _feature_ $f_i$
