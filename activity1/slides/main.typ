@@ -22,18 +22,18 @@
 ] 
 
 #title-slide[
-    = Guided Local Search (GLS)",
-    == Tópicos Especiais em Otimização I",
-
-
-    Henrique Coutinho Layber \
+    = Guided Local Search (GLS)
+    == Tópicos Especiais em Otimização I
     2023/2
+
+    Henrique Coutinho Layber
+    \ \ \
 
     #image("../assets/lagostim.png", fit: "contain", width: 6em, alt: "Lagostim")
 ]
 
 #slide[
-    = Agenda da apresentação
+    = Roteiro da apresentação
 
     + O que é Guided Local Search (GLS)?
     + Resumo do Local Search
@@ -41,7 +41,7 @@
         + História
         + Objetivo
         + Função objetivo aumentada
-        + Exemplo de aplicação
+        + Pseudocódigo
 ]
 
 #slide[
