@@ -1,60 +1,56 @@
+#let title = "Atividade 1: Guided Local Search"
 #let author = "Henrique Coutinho Layber"
-#let institution = "Federal University of Espírito Santo"
-#let title = "A survey on Guided Local Search (GLS)"
 #set document(title: title, author: author)
-// This has no visible output, but embeds metadata into the PDF!
 
 #set text(
   font: "New Computer Modern",
 )
+
 #set par(justify: true)
+
 #set page(header: locate(loc => {
   if counter(page).at(loc).first() > 1 [
     #title
     #h(1fr)
-    #institution
+    #author
   ]
 }))
 
-#align(center, text(17pt)[
-  * #title *
+#align(center, text(17pt, weight: "bold")[
+  Tópicos Especiais em Otimização I \
+  2023/2 \
+  #title \
+  #author \
+  #datetime.today().display()
 ])
 
-
-#grid(
-  columns: (1fr),
-  align(center)[
-    #author \
-    #institution \
-    #link("mailto:henrique.layber@edu.ufes.br") \
-    `2018103824`
-  ]
-)
-
 #show heading: it => [
-//   #set align(center)
+  // #set align(center)
   #block(smallcaps(it.body))
 ]
 
+= Abstract
+
+= Resumo
+
+// #outline()
 
 = Introduction
-// Explain in general what will be presented. Algorithm characteristics, main applications.
+// Explicar em linhas gerais o que será apresentado, características, principais aplicações
 
-#outline()
 
-= History
+= Histórico e Estado da Arte
+// Falar sobre as principais referências sobre a meta-heurística desde sua origem.
 
-= State of the art
+= Definição e descrição
+// Pseudocódigo e explicação do funcionamento da meta-heurística, com exemplos
 
-= Definition
+= Exemplo de aplicação em problema de Otimização Combinatória
+// Não precisa necessariamente ser o timetabling, pode ser outro problema
 
-= Description
+= Conclusão
+Harry#cite("harry")
 
-= Applying on Timetable problem (TTP)
-
-= Conclusion
-#cite("harry")
-
-= References
+= Referências
 
 #bibliography("works.yml")
