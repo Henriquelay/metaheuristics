@@ -1,14 +1,247 @@
-harry:
-    type: Book
-    title: Harry Potter and the Order of the Phoenix
-    author: Rowling, J. K.
-    volume: 5
-    page-total: 768
-    date: 2003-06-21
+---
+handbook2018:
+  type: chapter
+  author:
+    - Alsheddy, Abdullah
+    - Tsang, Edward P. K.
+    - Alhindi, Ahmad
+    - Voudouris, Christos
+  editor:
+    - Martí, Panos M.
+    - Resende, Mauricio G. C.
+    - Pardalos, Rafael
+  parent:
+    - type: book
+      location: Cham
+      publisher: Springer International Publishing
+  date: 2018
+  url: "https://doi.org/10.1007/978-3-319-07124-4_2"
+  doi: 10.1007/978-3-319-07124-4_2
+  page-range: 261-297
+  isbn: 978-3-319-07124-4
+  title: Guided Local Search
 
-electronic:
-    type: Web
-    title: Ishkur's Guide to Electronic Music
-    serial-number: v2.5
-    author: Ishkur
-    url: http://www.techno.org/electronic-music-guide/
+GENET:
+  type: article
+  title: Solving constraint satisfaction problems using neural networks
+  date: 1991
+  doi: ""
+  author:
+    - "Wang, C.J."
+    - "Tsang, E.P.K."
+  parent:
+    - type: proceedings
+      issue: ""
+      title: 1991 Second International Conference on Artificial Neural Networks
+      volume: 0
+  page-range: 295-299
+
+GENET_nb:
+  type: article
+  editor: "Taylor, J. G."
+  parent:
+    - type: proceedings
+      location: London
+      publisher:
+        value: Springer London
+        sentence-case: Springer london
+      title: Neural Network Applications
+  title: A Generic Neural Network Approach For Constraint Satisfaction Problems
+  isbn: 978-1-4471-2003-2
+  author:
+    - Tsang, E. P. K.
+    - Wang, C. J."
+  date: 1992
+  page-range: 12-22
+
+voudouris1997:
+  type: thesis
+  title: Guided local search for combinatorial optimisation problems.
+  date: 1997
+  organization: University of Essex
+  author: "Voudouris, Christos"
+
+voudouris1998:
+  type: article
+  date: 1998-07-01
+  url: "https://doi.org/10.1023/A:1009665513140"
+  page-range: 46-50
+  title: Guided Local Search --- an Illustrative Example in Function Optimisation
+  issn: 1573-1995
+  author: "Voudouris, C."
+  doi: "10.1023/A:1009665513140"
+  parent:
+    - type: periodical
+      title:
+        value: BT Technology Journal
+        sentence-case: Bt technology journal
+      issue: 3
+      volume: 16
+
+voudouris1999TSP:
+  type: article
+  parent:
+    - type: periodical
+      title: European Journal of Operational Research
+      issue: 2
+      volume: 113
+  issn: 0377-2217
+  doi: "https://doi.org/10.1016/S0377-2217(98)00099-X"
+  author:
+    - "Voudouris, Christos"
+    - "Tsang, Edward"
+  url: "https://www.sciencedirect.com/science/article/pii/S037722179800099X"
+  page-range: 469-499
+  title: Guided local search and its application to the traveling salesman problem
+  date: 1999
+
+mills2002:
+  type: thesis
+  organization: University of Essex
+  author: "Mills, P. H."
+  title: Extensions to guided local search
+  date: 2002
+
+alsheddy2011multiobjective:
+  type: thesis
+  author: "Alsheddy, Abdullah"
+  title:
+    value: "Empowerment scheduling: a multi-objective optimization approach using guided local search"
+    sentence-case: "Empowerment scheduling: a multi-objective optimization approach using guided local search"
+  organization: Citeseer
+  date: 2011
+
+fibreoptics:
+  type: article
+  title: Optimising the deployment of fibre optics using Guided Local Search
+  author:
+    - "Cramer, Sam"
+    - "Kampouridis, Michael"
+  doi: 10.1109/CEC.2015.7256973
+  parent:
+    - type: proceedings
+      issue: ""
+      volume: 0
+      title:
+        value: 2015 IEEE Congress on Evolutionary Computation (CEC)
+        sentence-case: 2015 ieee congress on evolutionary computation (cec)
+  page-range: 799-806
+  date: 2015
+
+leng1999:
+  type: article
+  date: 1999
+  author: "Leng, Lau Tung"
+  parent:
+    - type: periodical
+      title:
+        value: "University of Essex, A thesis submitted for the degree of Ph. D in Computer Science, Department of Computer Science"
+        sentence-case: "University of essex, a thesis submitted for the degree of ph. d in computer science, department of computer science"
+      publisher: Citeseer
+  title: Guided genetic algorithm
+
+zachariadis2009:
+  type: article
+  parent:
+    - type: periodical
+      title: Expert Systems with Applications
+      issue: "2, Part 1"
+      volume: 36
+  issn: 0957-4174
+  url: "https://www.sciencedirect.com/science/article/pii/S095741740700526X"
+  date: 2009
+  title: A hybrid metaheuristic algorithm for the vehicle routing problem with simultaneous delivery and pick-up service
+  page-range: 1070-1081
+  doi: "https://doi.org/10.1016/j.eswa.2007.11.005"
+  author:
+    - "Zachariadis, Emmanouil E."
+    - "Tarantilis, Christos D."
+    - "Kiranoudis, Chris T."
+    
+glsvrp2019:
+  type: article
+  isbn: 978-3-031-37126-4
+  author: 
+    - Adriano S., Silva
+    - Pereira, Ana I.
+    - Silva, Adrián M. T.
+    - Gomes, Helder T.
+    - Lima, José
+  parent:
+    - type: proceedings
+      location: Cham
+      title:
+        value: Computational Science and Its Applications -- ICCSA 2023 Workshops
+        sentence-case: Computational science and its applications -- iccsa 2023 workshops
+      publisher:
+        value: Springer Nature Switzerland
+        sentence-case: Springer nature switzerland
+  editor: 
+    - Gervasi, Osvaldo
+    - Rocha, Ana Maria A. C.
+    - Garau, Chiara
+    - Scorza, Francesco
+    - Karaca, Yeliz
+    - Torre, Carmelo M., 
+    - Murgante, Beniamino
+  title: Execution Time Experiments to Solve Capacitated Vehicle Routing Problem
+  date: 2023
+  page-range: 273-289
+  
+arnold2019knowledge:
+  type: article
+  author:
+    - "Arnold, Florian"
+    - "Sörensen, Kenneth"
+  parent:
+    - type: periodical
+      volume: 105
+      title: Computers & Operations Research
+  page-range: 32-46
+  date: 2019
+  issn: 0305-0548
+  url: "https://www.sciencedirect.com/science/article/pii/S0305054819300024"
+  doi: "https://doi.org/10.1016/j.cor.2019.01.002"
+  title: Knowledge-guided local search for the vehicle routing problem
+
+handbook2010:
+  type: book
+  publisher: Springer
+  date: 2010
+  title: Handbook of metaheuristics
+  author:
+    - "Gendreau, Michel"
+    - "Potvin, Jean-Yves"
+    - others
+  volume: 2
+
+gonçalves2021:
+  type: article
+  title:
+    value: INDICADORES DE DESEMPENHO PARA PLANOS DE ROTAS NO PROBLEMA DE ROTEIRIZAÇ~AO DE VEÍCULOS COM JANELAS DE TEMPO
+    title-case: Indicadores De Desempenho Para Planos De Rotas No Problema De Roteirizaç~AO De VeÍCulos Com Janelas De Tempo
+    sentence-case: Indicadores de desempenho para planos de rotas no problema de roteirizaç~Ao de veÍculos com janelas de tempo
+  author:
+    - "Gonçalves, M. J"
+    - "dos Santos da Silveira, Larissa"
+    - "da Cruz, José Hilário"
+    - "de Lucena Nunes, Denilson Ricardo"
+    - "Melo, André Cristiano Silva"
+    - "Monteiro, Nathália Jucá"
+  parent:
+    - type: proceedings
+  date: 2021
+  url: "https://api.semanticscholar.org/CorpusID:236387217"
+  
+morais2018:
+  type: article
+  date: 2018
+  parent:
+    - type: proceedings
+  title:
+    value: Otimizaç~ao de Rotas Sequenciais Multiobjetivo aplicada em Redes Viárias de Larga Escala com Congestionamento de Veículos
+    title-case: Otimizaç~aO De Rotas Sequenciais Multiobjetivo Aplicada Em Redes ViáRias De Larga Escala Com Congestionamento De VeíCulos
+  url: "https://api.semanticscholar.org/CorpusID:216849170"
+  author:
+    - "de Morais, Ren^e D. N."
+    - "Garrozi, Cícero"
