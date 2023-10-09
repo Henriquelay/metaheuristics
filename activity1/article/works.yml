@@ -157,7 +157,7 @@ zachariadis2009:
     - "Zachariadis, Emmanouil E."
     - "Tarantilis, Christos D."
     - "Kiranoudis, Chris T."
-    
+
 glsvrp2019:
   type: article
   isbn: 978-3-031-37126-4
@@ -187,7 +187,7 @@ glsvrp2019:
   title: Execution Time Experiments to Solve Capacitated Vehicle Routing Problem
   date: 2023
   page-range: 273-289
-  
+
 arnold2019knowledge:
   type: article
   author:
@@ -218,9 +218,9 @@ handbook2010:
 gonçalves2021:
   type: article
   title:
-    value: INDICADORES DE DESEMPENHO PARA PLANOS DE ROTAS NO PROBLEMA DE ROTEIRIZAÇ~AO DE VEÍCULOS COM JANELAS DE TEMPO
-    title-case: Indicadores De Desempenho Para Planos De Rotas No Problema De Roteirizaç~AO De VeÍCulos Com Janelas De Tempo
-    sentence-case: Indicadores de desempenho para planos de rotas no problema de roteirizaç~Ao de veÍculos com janelas de tempo
+    value: INDICADORES DE DESEMPENHO PARA PLANOS DE ROTAS NO PROBLEMA DE ROTEIRIZAÇÃO DE VEÍCULOS COM JANELAS DE TEMPO
+    title-case: Indicadores De Desempenho Para Planos De Rotas No Problema De Roteirização De Veículos Com Janelas De Tempo
+    sentence-case: Indicadores de desempenho para planos de rotas no problema de roteirização de veículos com janelas de tempo
   author:
     - "Gonçalves, M. J"
     - "dos Santos da Silveira, Larissa"
@@ -232,16 +232,11 @@ gonçalves2021:
     - type: proceedings
   date: 2021
   url: "https://api.semanticscholar.org/CorpusID:236387217"
-  
-morais2018:
-  type: article
-  date: 2018
-  parent:
-    - type: proceedings
-  title:
-    value: Otimizaç~ao de Rotas Sequenciais Multiobjetivo aplicada em Redes Viárias de Larga Escala com Congestionamento de Veículos
-    title-case: Otimizaç~aO De Rotas Sequenciais Multiobjetivo Aplicada Em Redes ViáRias De Larga Escala Com Congestionamento De VeíCulos
+
+morais2018:  
+  value: Otimização de Rotas Sequenciais Multiobjetivo aplicada em Redes Viárias de Larga Escala com Congestionamento de Veículos
+  title-case: Otimização De Rotas Sequenciais Multiobjetivo Aplicada Em Redes Viárias De Larga Escala Com Congestionamento De Veículos
   url: "https://api.semanticscholar.org/CorpusID:216849170"
   author:
-    - "de Morais, Ren^e D. N."
+    - "de Morais, Renê D. N."
     - "Garrozi, Cícero"
