@@ -117,15 +117,15 @@ Em uma ótima local, os parâmetros de penalidade $p_i$ correspondentes às prop
 
 $ "util"(s_*, i) = I_i(s_*) (c_i)/(1+p_i) $ <util>
 
-Incrementar o parâmetro da propriedade $i$ é considerada uma _ação_ com valor de utilidade dado pela @util. Em uma ótima local as ações com utilidade _máxima_ são selecionadas e então efetuadas empregando o valor atual da penalidade como divisor para $p_i$ para que não seja totalmente enviesado para a penalização das propriedades de alto custo. Assim, se a propriedade foi penalizada múltiplas vezes, então o termo $c_i/(1+p)$ na @util diminui para essa propriedade, diversificando escolhas e dando oportunidades para que outras propriedades também sejam penalizadas, e que propriedades sejam penalizadas com frequência proporcional a seu custo.
+Incrementar a penalidade $p_i$ é considerada uma _ação_ com valor de utilidade dado pela @util. Em uma ótima local apenas as ações com utilidade _máxima_ são selecionadas e então efetuadas, empregando o valor atual da penalidade como divisor para $p_i$ para que não seja totalmente enviesado para a penalização das propriedades de alto custo. Assim, se a propriedade foi penalizada múltiplas vezes, então o termo $c_i/(1+p)$ na @util diminui para essa propriedade, diversificando escolhas e dando oportunidades para que outras propriedades também sejam penalizadas, e que propriedades sejam penalizadas com frequência proporcional a seu custo.
 
 == Parâmetro de regularização
 
-Este parâmetro $lambda$ determina o grau em que as restrições irão afetar a LS. Um movimento altera a solução, adicionando novas propriedades e removendo propriedades existentes, enquanto outras propriedades não são alteradas. No caso geral, a diferença $Delta h$ no valor da função aumentada de custo é dada por:
+Este parâmetro $lambda$ determina o grau em que as restrições irão afetar a LS. Um movimento altera a solução, adicionando novas propriedades e removendo propriedades existentes. No caso geral, a diferença $Delta h$ no valor da função aumentada é dada por:
 
 $ Delta h = Delta g + lambda sum_(i=1)^M Delta I_i p_i $ <deltah>
 
-Como podemos ver em @deltah, se $lambda$ for grande, então os movimentos irão somente remove as propriedades da solução e as penalidades irão dominar o trajeto do LS. Isso introduz risco, pois as informações podem estar erradas. Por outro lado, se $lambda$ for pequeno, então os movimentos irão somente adicionar propriedades à solução e as informações de penalidade não terão efeito. Isso também introduz risco, pois o LS pode ficar preso em um ótimo local. Então, o parâmetro de regularização $lambda$ controla o grau em que as penalidades afetam o LS. O GLS é tolerante quanto ao parâmetro de regularização $lambda$, operando bem com uma variada gama de valores#cite("voudouris1997").
+@deltah mostra que se $lambda$ for grande, então os movimentos irão somente remove as propriedades da solução e as penalidades irão dominar o trajeto do LS. Isso introduz risco, pois as informações podem estar erradas. Por outro lado, se $lambda$ for pequeno, então os movimentos irão somente adicionar propriedades à solução e as informações de penalidade não terão efeito. Então, o parâmetro de regularização $lambda$ controla o grau em que as penalidades afetam o LS. O GLS é tolerante quanto a $lambda$, operando bem com uma variada gama de valores#cite("voudouris1997").
 
 #block(breakable: false)[
 == Pseudocódigo
@@ -196,7 +196,7 @@ Para aplicar o GLS ao TSP, precisamos definir as propriedades da solução. Um c
   / $lambda$: Parâmetro de regularização
 ]
 
-E o LS precisa usar $D'$ ao invés de $D$ nas avaliação de movimentos. O GLS modifica $P$ e através disso também modifica $D'$, sempre que o LS atinge um ótimo local
+E o LS precisa usar $D'$ ao invés de $D$ na avaliação de movimentos. O GLS modifica $P$ e através disso também modifica $D'$, sempre que o LS atinge um ótimo local
 
 Considerando um LS simples (2-Opt), uma solução vizinha é obtida através da solução atual removendo duas arestas, invertendo a ordem das arestas resultantes e reconectando o tour. Em termos práticos, isso significa inverter a ordem de cidades em uma seção contígua do vetor de distâncias. Se $e_1$ e $e_2$ são removidos e $e_3$ e $e_4$ são adicionados, cada um com distâncias $d_1$, $d_2$, $d_3$ e $d_4$, então a mudança do custo do movimento é dado por:
 
