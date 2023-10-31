@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "GLSUCTP"
+version = "0.1.0"
+description = "Using Guided Local Search to solve the University Course Timetabling Problem"
+authors = ["Henriquelay <37563861+Henriquelay@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
