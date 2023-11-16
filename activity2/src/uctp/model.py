@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+from enum import Enum
+from math import inf
 from typing import Self, Sequence
 from weakref import ref
 
@@ -23,32 +26,17 @@ class Room:
         return cls(name, capacity), line
 
 
-class Teacher:
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def __str__(self) -> str:
-        return f"""Teacher(Name = {self.name})"""
-
-    @classmethod
-    def parse(cls, line: str) -> tuple[Self, str]:
-        """Parses a teacher from a line, removing it from the line."""
-
-        teacher, line = parse_word(line)
-        return cls(teacher), line
-
-
 class Course:
     def __init__(
         self,
         name: str,
-        teacher: Teacher,
+        teacher: str,
         lectures: int,
         min_working_days: int,
         students: int,
     ) -> None:
         self.name = name
-        self.teacher = ref(teacher)
+        self.teacher = teacher
         self.lectures = lectures
         self.min_working_days = min_working_days
         self.students = students
@@ -58,7 +46,7 @@ class Course:
     def __str__(self) -> str:
         return f"""Course(\
 Name = {self.name},\
-Teacher = @|{self.teacher().__str__()}|,\
+Teacher = {self.teacher},\
 Lectures = {self.lectures},\
 MinWorkingDays = {self.min_working_days},\
 Students = {self.students},\
@@ -73,7 +61,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         """Parses a course from a line, removing it from the line."""
 
         name, line = parse_word(line)
-        teacher, line = Teacher.parse(line)
+        teacher, line = parse_word(line)
         lectures, line = parse_int(line)
         min_working_days, line = parse_int(line)
         students, line = parse_int(line)
@@ -107,8 +95,8 @@ Period = {self.period}\
 
         word, line = parse_word(line)
         course = courses[word]
-        period, line = parse_int(line)
         day, line = parse_int(line)
+        period, line = parse_int(line)
         return cls(course, day, period), line
 
 
@@ -145,7 +133,6 @@ class UCTP:
         name: str,
         days: int,
         periods_per_day: int,
-        courses: dict[str, Course],
         rooms: dict[str, Room],
         curricula: dict[str, Curriculum],
         constraints: list[Constraint],
@@ -153,7 +140,6 @@ class UCTP:
         self.name = name
         self.days = days
         self.periods_per_day = periods_per_day
-        self.courses = courses
         self.rooms = rooms
         self.curricula = curricula
         self.constraints = constraints
@@ -163,7 +149,6 @@ class UCTP:
 Name = {self.name}\
 Days = {self.days}\
 PeriodsPerDay = {self.periods_per_day}\
-Courses = {[(k, v.__str__()) for k, v in self.courses.items()]}\
 Rooms = {[(k, v.__str__()) for k, v in self.rooms.items()]}\
 Curricula = {[(k, v.__str__()) for k, v in self.curricula.items()]}\
 Constraints = {[v.__str__() for v in self.constraints]}\
@@ -208,7 +193,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 raise Exception(f"Expected end of line. Found {line}.")
             courses[course.name] = course
             body = body[1:]
-        
+
         body = skip_white_lines(body)
         rooms = {}
         keyword(body[0], "ROOMS:")
@@ -230,7 +215,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 raise Exception(f"Expected end of line. Found {line}.")
             curricula[curriculum.name] = curriculum
             body = body[1:]
-        
+
         body = skip_white_lines(body)
         constraints = []
         keyword(body[0], "UNAVAILABILITY_CONSTRAINTS:")
@@ -246,7 +231,6 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             name,
             days,
             periods_per_day,
-            courses,
             rooms,
             curricula,
             constraints,
@@ -256,17 +240,41 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         """Returns a graph representation of the problem."""
 
         graph = Graph()
-        for course in self.courses.values():
-            graph.add_node(course.name, color="blue")
-        for room in self.rooms.values():
-            graph.add_node(room.name, color="red")
-        for constraint in self.constraints:
-            course = constraint.course()
-            if course:
-                graph.add_edge(course.name, constraint.day)
-            else:
-                raise Exception(f"Constraint {constraint} has lost reference to the course.")
+        for curriculum in self.curricula.values():
+            for course in curriculum.courses.values():
+
+                def add_edge(course1, course2) -> None:
+                    """Adds an edge between two courses. If one already exists, adds `1` to its weight."""
+
+                    try:
+                        graph.add_edge(course1, course2, weight=1)
+                    except KeyError:
+                        graph.edges[course1, course2]["weight"] += 1
+
+                try:
+                    node = graph.nodes[course.name]
+                    # add curriculum to course
+                    node["curricula"].append(curriculum)
+                    # add edges between courses in the same curriculum
+                except KeyError:
+                    # add course to graph
+                    graph.add_node(course.name, curricula=[curriculum])
+                # add edges between courses in the same curriculum
+                for other_course in curriculum.courses.values():
+                    if other_course != course:
+                        add_edge(course.name, other_course.name)
+
         return graph
+
+
+def evaluate_solution(graph: Graph, weights: Sequence[float]) -> tuple[float, bool]:
+    """Evaluates a graph solution for UCTP and returns a score for the number of rule violations. Returns a tuple with the score and a boolean indicating if the solution is feasible."""
+
+    # Checking hard violations
+    # for e in graph.edges:
+    # If there is an edge between two courses, it means that they are scheduled at the same time
+
+    return (inf, True)
 
 
 # Name: Toy

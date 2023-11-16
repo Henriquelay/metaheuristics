@@ -1,3 +1,4 @@
+import networkx as nx
 from uctp.model import UCTP, Constraint
 
 TOY_INSTANCE = """Name: Toy
@@ -49,7 +50,6 @@ def test_parse_all_instances():
             assert problem.name is not None
             assert problem.days is not None
             assert problem.periods_per_day is not None
-            assert len(problem.courses) > 0
             assert len(problem.rooms) > 0
             assert len(problem.curricula) > 0
             assert len(problem.constraints) > 0
@@ -62,13 +62,9 @@ def test_UCTP_parsing():
     assert problem.name == "Toy"
     assert problem.days == 5
     assert problem.periods_per_day == 4
-    assert len(problem.courses) == 4
     assert len(problem.rooms) == 3
     assert len(problem.curricula) == 2
     assert len(problem.constraints) == 8
-
-    courses_names = {course.name for course in problem.courses.values()}
-    assert courses_names == {"SceCosC", "ArcTec", "TecCos", "Geotec"}
 
     rooms_names = {room.name for room in problem.rooms.values()}
     assert rooms_names == {"rA", "rB", "rC"}
@@ -76,21 +72,13 @@ def test_UCTP_parsing():
     curricula_names = {curriculum.name for curriculum in problem.curricula.values()}
     assert curricula_names == {"Cur1", "Cur2"}
 
-    assert problem.courses["SceCosC"].lectures == 3
-    assert problem.courses["SceCosC"].min_working_days == 3
-    assert problem.courses["SceCosC"].students == 30
-
-    assert problem.courses["ArcTec"].lectures == 4
-    assert problem.courses["ArcTec"].min_working_days == 3
-    assert problem.courses["ArcTec"].students == 42
-
-    assert problem.courses["TecCos"].lectures == 3
-    assert problem.courses["TecCos"].min_working_days == 4
-    assert problem.courses["TecCos"].students == 40
-
-    assert problem.courses["Geotec"].lectures == 3
-    assert problem.courses["Geotec"].min_working_days == 4
-    assert problem.courses["Geotec"].students == 18
+    for curriculum in problem.curricula.values():
+        if curriculum.name == "Cur1":
+            assert {course.name for course in curriculum.courses.values()} == {"SceCosC", "ArcTec", "TecCos"}
+        elif curriculum.name == "Cur2":
+            assert {course.name for course in curriculum.courses.values()} == {"TecCos", "Geotec"}
+        else:
+            assert False
 
     assert problem.rooms["rA"].capacity == 32
     assert problem.rooms["rB"].capacity == 50
@@ -99,7 +87,7 @@ def test_UCTP_parsing():
     assert {course.name for course in problem.curricula["Cur1"].courses.values()} == {"SceCosC", "ArcTec", "TecCos"}
     assert {course.name for course in problem.curricula["Cur2"].courses.values()} == {"TecCos", "Geotec"}
 
-    def assert_constraint(constraint: Constraint, course_name: str, period: int, day: int):
+    def assert_constraint(constraint: Constraint, course_name: str, day: int, period: int):
         course = constraint.course()
         assert course is not None
         assert course.name == course_name
@@ -114,3 +102,18 @@ def test_UCTP_parsing():
     assert_constraint(problem.constraints[5], "ArcTec", 4, 1)
     assert_constraint(problem.constraints[6], "ArcTec", 4, 2)
     assert_constraint(problem.constraints[7], "ArcTec", 4, 3)
+
+def test_UCTP_graph():
+    """ Asserts graph generation for UCTP curricula """
+
+    problem = UCTP.parse(TOY_INSTANCE.splitlines())
+    graph = problem.to_graph()
+
+    def edges_in_clique(size: int) -> int:
+        return size * (size - 1) // 2
+
+    assert len(graph.nodes) == 4
+    assert len(graph.edges) == edges_in_clique(3) + edges_in_clique(2)
+    
+    cliques = nx.find_cliques(graph)
+    assert sum(1 for _ in cliques) == 2
