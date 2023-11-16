@@ -13,7 +13,7 @@ COURSES:
 SceCosC Ocra 3 3 30
 ArcTec Indaco 4 3 42
 TecCos Rosa 3 4 40
-Geotec Scarlatti 3 4 18
+GeoTec Scarlatti 3 4 18
 
 ROOMS:
 rA 32
@@ -22,7 +22,7 @@ rC 40
 
 CURRICULA:
 Cur1 3 SceCosC ArcTec TecCos
-Cur2 2 TecCos Geotec
+Cur2 2 TecCos GeoTec
 
 UNAVAILABILITY_CONSTRAINTS:
 TecCos 2 0
@@ -76,7 +76,7 @@ def test_UCTP_parsing():
         if curriculum.name == "Cur1":
             assert {course.name for course in curriculum.courses.values()} == {"SceCosC", "ArcTec", "TecCos"}
         elif curriculum.name == "Cur2":
-            assert {course.name for course in curriculum.courses.values()} == {"TecCos", "Geotec"}
+            assert {course.name for course in curriculum.courses.values()} == {"TecCos", "GeoTec"}
         else:
             assert False
 
@@ -85,7 +85,7 @@ def test_UCTP_parsing():
     assert problem.rooms["rC"].capacity == 40
 
     assert {course.name for course in problem.curricula["Cur1"].courses.values()} == {"SceCosC", "ArcTec", "TecCos"}
-    assert {course.name for course in problem.curricula["Cur2"].courses.values()} == {"TecCos", "Geotec"}
+    assert {course.name for course in problem.curricula["Cur2"].courses.values()} == {"TecCos", "GeoTec"}
 
     def assert_constraint(constraint: Constraint, course_name: str, day: int, period: int):
         course = constraint.course()
@@ -111,6 +111,11 @@ def test_UCTP_graph():
 
     def edges_in_clique(size: int) -> int:
         return size * (size - 1) // 2
+
+    assert len(graph.edges("GeoTec")) == 1
+    assert len(graph.edges("TecCos")) == 3
+    assert len(graph.edges("ArcTec")) == 2
+    assert len(graph.edges("SceCosC")) == 2
 
     assert len(graph.nodes) == 4
     assert len(graph.edges) == edges_in_clique(3) + edges_in_clique(2)
