@@ -1,10 +1,11 @@
-from __future__ import  annotations
+from __future__ import annotations
 
 from typing import Callable
 from enum import Enum
 
 from utils.dropping_stack import DroppingStack
 from networkx import Graph
+
 
 class Problem[D, I]:
     """A generic minimization/optimization problem. D is the domain of the problem, and I is the image of the problem."""
@@ -13,7 +14,13 @@ class Problem[D, I]:
         MAXIMIZATION = 1
         MINIMIZATION = 2
 
-    def __init__(self, objective_function: Callable[[D], I], kind: ProblemKind, search_space: tuple[D, D], graph: Graph):
+    def __init__(
+        self,
+        objective_function: Callable[[D], I],
+        kind: ProblemKind,
+        search_space: tuple[D, D],
+        graph: Graph,
+    ):
         self.objective_function = objective_function
         self.kind = kind
         self.search_space = search_space
@@ -24,6 +31,7 @@ class Problem[D, I]:
 
         return self.objective_function(solution)
 
+
 class LocalSearch[D, I]:
     """A generic local search algorithm"""
 
@@ -31,14 +39,16 @@ class LocalSearch[D, I]:
         TWO_OPT = 2
         THREE_OPT = 3
 
-    def __init__(self, problem: Problem[D, I], max_iterations=1000, n_opt=N_OPT.TWO_OPT):
+    def __init__(
+        self, problem: Problem[D, I], max_iterations=1000, n_opt=N_OPT.TWO_OPT
+    ):
         self.max_iterations = max_iterations
         self.problem = problem
         self.last_solutions = DroppingStack(max_size=5)
 
     def stopping_criterion(self, iteration: int) -> bool:
         """Returns whether the local search should stop or not. True means stop, False means continue."""
-        
+
         # At least three solutions must have been evaluated.
         if len(self.last_solutions) < 3:
             return False
@@ -47,7 +57,7 @@ class LocalSearch[D, I]:
         last = self.last_solutions[-1]
         if last == self.last_solutions[-2] and last == self.last_solutions[-3]:
             return True
-        
+
         # If the delta between the last five solutions is less than 1%.
         if len(self.last_solutions) >= 5:
             delta = self.last_solutions[-1] - self.last_solutions[-5]

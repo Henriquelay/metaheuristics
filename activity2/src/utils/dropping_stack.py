@@ -33,21 +33,20 @@ class DroppingStack[T]:
 
     def __len__(self) -> int:
         return len(self.stack)
-    
+
     def __getitem__(self, index: int) -> T:
         return self.stack[index]
-    
+
     def __iter__(self) -> Iterator[T]:
         return iter(self.stack)
-    
+
     def __str__(self) -> str:
         return f"DroppingStack({self.stack})"
-    
+
     def __repr__(self) -> str:
         return str(self)
-    
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, DroppingStack):
             return NotImplemented
         return self.stack == other.stack
-    

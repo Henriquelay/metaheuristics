@@ -17,10 +17,7 @@ def parse(path: str):
 def skip_white_lines(body: Sequence[str]) -> Sequence[str]:
     """Removes all white lines from the beginning of the body."""
 
-    while (
-        body[0].isspace()
-        or body[0] == ""
-    ):
+    while body[0].isspace() or body[0] == "":
         body = body[1:]
     return body
 
@@ -29,7 +26,9 @@ def keyword(line: str, keyword: str) -> str:
     """Parses a keyword from a line, removing it from the line."""
 
     if not line.startswith(keyword):
-        raise Exception(f"Expected keyword {keyword!r} but found {line[:len(keyword)]!r}.")
+        raise Exception(
+            f"Expected keyword {keyword!r} but found {line[:len(keyword)]!r}."
+        )
     return line[len(keyword) :]
 
 
