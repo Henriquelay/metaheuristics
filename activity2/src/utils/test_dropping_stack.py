@@ -1,4 +1,4 @@
-from dropping_stack import DroppingStack
+from utils.dropping_stack import DroppingStack
 
 
 def test_more_than_max_size():

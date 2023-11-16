@@ -13,15 +13,16 @@ class Problem[D, I]:
         MAXIMIZATION = 1
         MINIMIZATION = 2
 
-    def __init__(self, value_func: Callable[[D], I], kind: ProblemKind, search_space: tuple[D, D]):
-        self.value_func = value_func
+    def __init__(self, objective_function: Callable[[D], I], kind: ProblemKind, search_space: tuple[D, D], graph: Graph):
+        self.objective_function = objective_function
         self.kind = kind
         self.search_space = search_space
+        self.graph = graph
 
-    def value(self, solution: D) -> I:
+    def value_at(self, solution: D) -> I:
         """Returns the value of the solution in the point I"""
 
-        return self.value_func(solution)
+        return self.objective_function(solution)
 
 class LocalSearch[D, I]:
     """A generic local search algorithm"""
@@ -33,20 +34,26 @@ class LocalSearch[D, I]:
     def __init__(self, problem: Problem[D, I], max_iterations=1000, n_opt=N_OPT.TWO_OPT):
         self.max_iterations = max_iterations
         self.problem = problem
-        self.last_solution = DroppingStack(max_size=5)
+        self.last_solutions = DroppingStack(max_size=5)
 
     def stopping_criterion(self, iteration: int) -> bool:
         """Returns whether the local search should stop or not. True means stop, False means continue."""
-        # If the last two solutions are the same.
-        if len(self.last_solution) >= 2 and self.last_solution[-1] == self.last_solution[-2]:
+        
+        # At least three solutions must have been evaluated.
+        if len(self.last_solutions) < 3:
+            return False
+
+        # If the last three solutions are the same.
+        last = self.last_solutions[-1]
+        if last == self.last_solutions[-2] and last == self.last_solutions[-3]:
             return True
         
         # If the delta between the last five solutions is less than 1%.
-        if len(self.last_solution) >= 5:
-            delta = self.last_solution[-1] - self.last_solution[-5]
-            if delta / self.last_solution[-1] < 0.01:
+        if len(self.last_solutions) >= 5:
+            delta = self.last_solutions[-1] - self.last_solutions[-5]
+            if delta / self.last_solutions[-1] < 0.01:
                 return True
-        
+
         # If the maximum number of iterations has been reached.
         return iteration >= self.max_iterations
 
@@ -60,7 +67,7 @@ class LocalSearch[D, I]:
         best_solution = solution
 
         # Initialize the best solution's image.
-        best_solution_value = self.problem.value(best_solution)
+        best_solution_value = self.problem.value_at(best_solution)
 
         # Initialize the iteration.
         iteration = 0
@@ -74,7 +81,7 @@ class LocalSearch[D, I]:
             best_neighbor = self.best_neighbor(neighbors)
 
             # Get the best neighbor value.
-            best_neighbor_value = self.problem.value(best_neighbor)
+            best_neighbor_value = self.problem.value_at(best_neighbor)
 
             # If the best neighbor is better than the current solution.
             if best_neighbor_value > best_solution_value:
@@ -85,7 +92,7 @@ class LocalSearch[D, I]:
                 best_solution_value = best_neighbor_value
 
             # If the best neighbor is better than the current solution.
-            if best_neighbor_value > self.problem.value(solution):
+            if best_neighbor_value > self.problem.value_at(solution):
                 # Update the solution.
                 solution = best_neighbor
 

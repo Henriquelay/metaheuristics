@@ -1,9 +1,9 @@
 from __future__ import annotations
-import json
-from typing import Self
-from weakref import WeakKeyDictionary, ref
+from typing import Self, Sequence
+from weakref import ref
 
-from uctp.instance_parser import parse_int, parse_word
+from uctp.instance_parser import parse_int, parse_word, skip_white_lines
+from networkx import Graph
 
 
 class Room:
@@ -88,8 +88,15 @@ class Constraint:
         course.add_constraint(self)
 
     def __str__(self) -> str:
+        course = self.course()
+        if course:
+            return f"""Constraint(\
+Course = @|{course.name}|,\
+Day = {self.day},\
+Period = {self.period}\
+)"""
         return f"""Constraint(\
-Course = @|{self.course().name}|,\
+Course = @|{course}|,\
 Day = {self.day},\
 Period = {self.period}\
 )"""
@@ -100,8 +107,8 @@ Period = {self.period}\
 
         word, line = parse_word(line)
         course = courses[word]
-        day, line = parse_int(line)
         period, line = parse_int(line)
+        day, line = parse_int(line)
         return cls(course, day, period), line
 
 
@@ -163,7 +170,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 )"""
 
     @classmethod
-    def parse(cls, body: list[str]) -> Self:
+    def parse(cls, body: Sequence[str]) -> Self:
         """Parses a whole instance definition from a list of lines."""
 
         from uctp.instance_parser import keyword
@@ -191,19 +198,6 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 
         body = body[7:]
 
-        def skip_white_lines(body: list[str]) -> list[str]:
-            """Removes all white lines from the beginning of the body."""
-
-            while (
-                body[0].isspace()
-                or body[0] == "\n"
-                or body[0] == "\r"
-                or body[0] == "\r\n"
-                or body[0] == "\n\r"
-            ):
-                body = body[1:]
-            return body
-
         body = skip_white_lines(body)
         courses = {}
         keyword(body[0], "COURSES:")
@@ -214,7 +208,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 raise Exception(f"Expected end of line. Found {line}.")
             courses[course.name] = course
             body = body[1:]
-
+        
         body = skip_white_lines(body)
         rooms = {}
         keyword(body[0], "ROOMS:")
@@ -234,9 +228,9 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             curriculum, line = Curriculum.parse(body[0], courses)
             if line:
                 raise Exception(f"Expected end of line. Found {line}.")
-            curricula[curriculum.name] = curricula
+            curricula[curriculum.name] = curriculum
             body = body[1:]
-
+        
         body = skip_white_lines(body)
         constraints = []
         keyword(body[0], "UNAVAILABILITY_CONSTRAINTS:")
@@ -257,6 +251,22 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             curricula,
             constraints,
         )
+
+    def to_graph(self) -> Graph:
+        """Returns a graph representation of the problem."""
+
+        graph = Graph()
+        for course in self.courses.values():
+            graph.add_node(course.name, color="blue")
+        for room in self.rooms.values():
+            graph.add_node(room.name, color="red")
+        for constraint in self.constraints:
+            course = constraint.course()
+            if course:
+                graph.add_edge(course.name, constraint.day)
+            else:
+                raise Exception(f"Constraint {constraint} has lost reference to the course.")
+        return graph
 
 
 # Name: Toy
