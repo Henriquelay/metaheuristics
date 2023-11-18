@@ -1,4 +1,10 @@
-import networkx as nx
+# pylint: disable=all
+
+from math import inf
+from pprint import pprint
+from typing import Any
+
+from pytest import raises
 from uctp.model import UCTP, Constraint
 
 TOY_INSTANCE = """Name: Toy
@@ -128,22 +134,252 @@ def test_UCTP_graph():
     problem = UCTP.parse(TOY_INSTANCE.splitlines())
     graph = problem.to_graph()
 
-    def assert_edges(node: str, expected_count: int):
-        edges = graph.edges(node)
-        assert len(edges) == expected_count
-        # for edge in edges:
-        #     assert edge["weight"] == 1
+    nodes_data = graph.nodes.data()
+    # Convert into a dict[node_name, data]
+    nodes: dict[str, dict[str, Any]] = {node[0]: node[1] for node in nodes_data}
+    pprint(nodes)
 
-    assert_edges("GeoTec", 1)
-    assert_edges("TecCos", 3)
-    assert_edges("ArcTec", 2)
-    assert_edges("SceCosC", 2)
+    for node in nodes:
+        # All nodes must have a color
+        assert "color" in nodes[node]
 
-    def edges_in_clique(size: int) -> int:
-        return size * (size - 1) // 2
+        # Same color nodes must not be adjacent.
+        for neighbor in graph.neighbors(node):
+            print(neighbor)
+            assert nodes[node]["color"] != nodes[neighbor]["color"]
 
-    assert len(graph.nodes) == 4
-    assert len(graph.edges) == edges_in_clique(3) + edges_in_clique(2)
+        if nodes[node]["color"] == "course":
+            # Course nodes must be connected to curriculum nodes which have the said course.
+            curricula_with_course = {
+                curriculum
+                for curriculum in problem.curricula.values()
+                if node in curriculum.courses
+            }
+            curricula_name_with_course = {
+                curriculum.name
+                for curriculum in curricula_with_course
+            }
+            course_node_curricula = {
+                neighbor
+                for neighbor in graph.neighbors(node)
+                if nodes[neighbor]["color"] == "curriculum"
+            }
+            assert curricula_name_with_course == course_node_curricula
 
-    cliques = nx.find_cliques(graph)
-    assert sum(1 for _ in cliques) == 2
+            # Course nodes must be connected to no room nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "room"
+                    }
+                )
+                == 0
+            )
+
+            # Course n odes must be connected to one and only one teacher node
+            expected_course = {problem.courses[node]}
+            assert len(expected_course) == 1
+            expected_course = expected_course.pop()
+
+            teacher_nodes = [
+                neighbor
+                for neighbor in graph.neighbors(node)
+                if nodes[neighbor]["color"] == "teacher"
+            ]
+            assert len(teacher_nodes) == 1
+            teacher_node = teacher_nodes[0]
+            assert expected_course.teacher == teacher_node
+
+        elif nodes[node]["color"] == "curriculum":
+            # Curriculum nodes must be connected to course nodes which are in the curriculum.
+            curriculum = problem.curricula[node]
+            course_nodes = {
+                neighbor
+                for neighbor in graph.neighbors(node)
+                if nodes[neighbor]["color"] == "course"
+            }
+            assert len(curriculum.courses) == len(course_nodes)
+            assert {course.name for course in curriculum.courses.values()} == {
+                problem.courses[node].name for node in course_nodes
+            }
+
+            # Curriculum nodes must be connected to no room nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "room"
+                    }
+                )
+                == 0
+            )
+
+            # Curriculum nodes must be connected to no teacher nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "teacher"
+                    }
+                )
+                == 0
+            )
+        
+        elif nodes[node]["color"] == "teacher":
+            # Teacher should exist in the problem
+            assert node in problem.teachers
+
+            # Teacher nodes must be connected to course nodes
+            course_nodes = {
+                neighbor
+                for neighbor in graph.neighbors(node)
+                if nodes[neighbor]["color"] == "course"
+            }
+            assert len(course_nodes) > 0
+
+            # Teacher nodes must be connected to no room nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "room"
+                    }
+                )
+                == 0
+            )
+
+            # Teacher nodes must be connected to no curriculum nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "curriculum"
+                    }
+                )
+                == 0
+            )
+
+        elif nodes[node]["color"] == "room":
+            # Room should exist in the problem
+            assert node.split()[0] in problem.rooms.keys()
+
+            # Room nodes must be connected to no course nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "course"
+                    }
+                )
+                == 0
+            )
+
+            # Room nodes must be connected to no curriculum nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "curriculum"
+                    }
+                )
+                == 0
+            )
+
+            # Room nodes must be connected to no teacher nodes.
+            assert (
+                len(
+                    {
+                        neighbor
+                        for neighbor in graph.neighbors(node)
+                        if nodes[neighbor]["color"] == "teacher"
+                    }
+                )
+                == 0
+            )
+
+class TestEvaluation:
+    def test_evaluation_hard_constraints(self):
+        """Asserts that the solution evaluation is correct"""
+
+        problem = UCTP.parse(TOY_INSTANCE.splitlines())
+
+        # Weights for soft constraints
+        weights = (0, 0, 0, 0)
+        evaluate = lambda solution: problem.evaluate(solution, weights)
+
+        # A valid solution
+        solution = {
+            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        assert evaluate(solution) is not None
+
+        # A solution with a course in an unavailable period
+        solution = {
+            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 3)],
+            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 0)],
+            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        with raises(ValueError, match="H4 violated"):
+            evaluate(solution)
+
+        # Two lectures of the same course in the same day-period
+        solution = {
+            "SceCosC":  [("rA", 0, 0), ("rA", 0, 0), ("rA", 2, 0)],
+            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        with raises(ValueError, match="H1 violated"):
+            evaluate(solution)
+
+        # Two courses in the same room at the same time
+        solution = {
+            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec":   [("rA", 0, 0), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        with raises(ValueError, match="H2 violated"):
+            evaluate(solution)
+
+        # Two courses of the same curriculum in the same day-period
+        solution = {
+            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec":   [("rB", 0, 0), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        with raises(ValueError, match="H3 violated"):
+            evaluate(solution)
+
+    def test_evaluation_soft_constraints(self):
+        """Asserts that the solution evaluation is correct"""
+
+        problem = UCTP.parse(TOY_INSTANCE.splitlines())
+
+        # Weights for soft constraints
+        weights = (0, 0, 0, 0)
+        evaluate = lambda solution: problem.evaluate(solution, weights)
+
+        # A valid solution
+        solution = {
+            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        assert evaluate(solution) == 0 
+
+        

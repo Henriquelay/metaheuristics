@@ -1,16 +1,21 @@
+"""A generic local search algorithm in graphs."""
+
 from __future__ import annotations
-from ast import TypeVar
 
 from typing import Callable
 from enum import Enum
 
-from utils.dropping_stack import DroppingStack
 from networkx import Graph
+
+from utils.dropping_stack import DroppingStack
+
 
 class Problem:
     """A generic minimization/optimization problem."""
 
     class ProblemKind(Enum):
+        """The kind of the problem."""
+
         MAXIMIZATION = 1
         MINIMIZATION = 2
 
@@ -47,18 +52,24 @@ class Problem:
         elif self.kind == Problem.ProblemKind.MINIMIZATION:
             return min(neighbor_values, key=self.value_at)
         else:
-            raise Exception("Invalid problem kind")
+            raise ValueError("Invalid problem kind")
 
 
 class LocalSearch:
     """A generic local search algorithm"""
 
-    class N_OPT(Enum):
+    class NOpt(Enum):
+        """The kind of neighborhood search step."""
+
         TWO_OPT = 2
         THREE_OPT = 3
 
     def __init__(
-        self, problem: Problem, neighborhood_size: int, max_iterations=1000, n_opt=N_OPT.TWO_OPT
+        self,
+        problem: Problem,
+        neighborhood_size: int,
+        max_iterations=1000,
+        n_opt=NOpt.TWO_OPT,
     ):
         self.max_iterations = max_iterations
         self.problem = problem
