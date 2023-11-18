@@ -103,7 +103,7 @@ Period = {self.period}\
 class Curriculum:
     def __init__(self, name: str, courses: list[Course]) -> None:
         self.name = name
-        self.courses = {}
+        self.courses: dict[str, Course] = {}
         for course in courses:
             self.courses[course.name] = course
 
@@ -237,44 +237,91 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         )
 
     def to_graph(self) -> Graph:
-        """Returns a graph representation of the problem."""
+        """Returns a graph base representation of the problem, with no solutions drawn."""
+
+        def add_edge(course1: str, course2: str) -> None:
+            """Adds an edge between two courses. If one already exists, adds `1` to its weight."""
+
+            try:
+                graph.add_edge(course1, course2, weight=1)
+            except KeyError:
+                graph.edges[course1, course2]["weight"] += 1
 
         graph = Graph()
         for curriculum in self.curricula.values():
+            graph.add_node(curriculum.name, color="curriculum")
+
             for course in curriculum.courses.values():
-
-                def add_edge(course1, course2) -> None:
-                    """Adds an edge between two courses. If one already exists, adds `1` to its weight."""
-
-                    try:
-                        graph.add_edge(course1, course2, weight=1)
-                    except KeyError:
-                        graph.edges[course1, course2]["weight"] += 1
-
                 try:
                     node = graph.nodes[course.name]
-                    # add curriculum to course
-                    node["curricula"].append(curriculum)
-                    # add edges between courses in the same curriculum
+                    # add students info to course
+                    node["students"].append(course.students)
                 except KeyError:
                     # add course to graph
-                    graph.add_node(course.name, curricula=[curriculum])
-                # add edges between courses in the same curriculum
-                for other_course in curriculum.courses.values():
-                    if other_course != course:
-                        add_edge(course.name, other_course.name)
+                    graph.add_node(
+                        course.name,
+                        color="course",
+                        students=[course.students],
+                    )
+                finally:
+                    # add curriculum to course
+                    graph.add_edge(curriculum.name, course.name)
+
+                try:
+                    node = graph.nodes[course.teacher]
+                except KeyError:
+                    # add teacher to graph
+                    graph.add_node(
+                        course.teacher,
+                        color="teacher",
+                    )
+                finally:
+                    # add course to teacher
+                    graph.add_edge(course.name, course.teacher)
+
+        for room in self.rooms.values():
+            for day in range(self.days):
+                for period in range(self.periods_per_day):
+                    graph.add_node(
+                        f"{room.name}-{day}-{period}",
+                        color="room-period",
+                        capacity=room.capacity,
+                    )
 
         return graph
 
+    def evaluate_solution(
+        self, solution: Graph, weights: tuple[float, float, float, float]
+    ) -> float:
+        """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
 
-def evaluate_solution(graph: Graph, weights: Sequence[float]) -> tuple[float, bool]:
-    """Evaluates a graph solution for UCTP and returns a score for the number of rule violations. Returns a tuple with the score and a boolean indicating if the solution is feasible."""
+        # Checking hard violations
 
-    # Checking hard violations
-    # for e in graph.edges:
-    # If there is an edge between two courses, it means that they are scheduled at the same time
+        for node in solution.nodes.data():
+            # All courses of a discipline must be alocated, and in different periods.
+            # This means that the number of edges between courses and room-periods must be equal to the number of lectures of the course.
+            if node.color == "course":
+                edge_count = sum([1 for _ in solution.neighbors(node)])
+                expected_count = sum(
+                    [
+                        curriculum.courses[node].lectures
+                        for curriculum in self.curricula.values()
+                    ]
+                )
+                if edge_count != expected_count:
+                    return inf
 
-    return (inf, True)
+            # Two courses cannot be allocated in the same room-period.
+            # This means that the number of edges between room-periods and courses must be less than or equal to 1.
+            elif node.color == "room-period":
+                edge_count = sum([1 for _ in solution.neighbors(node)])
+                if edge_count > 1:
+                    return inf
+
+            # All courses from the same curricula, or teached by the same teacher must be allocated in different periods.
+            # This means that the number of 
+
+        return inf
 
 
 # Name: Toy

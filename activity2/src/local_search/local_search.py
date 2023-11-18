@@ -1,4 +1,5 @@
 from __future__ import annotations
+from ast import TypeVar
 
 from typing import Callable
 from enum import Enum
@@ -6,9 +7,8 @@ from enum import Enum
 from utils.dropping_stack import DroppingStack
 from networkx import Graph
 
-
-class Problem[D, I]:
-    """A generic minimization/optimization problem. D is the domain of the problem, and I is the image of the problem."""
+class Problem:
+    """A generic minimization/optimization problem."""
 
     class ProblemKind(Enum):
         MAXIMIZATION = 1
@@ -16,9 +16,9 @@ class Problem[D, I]:
 
     def __init__(
         self,
-        objective_function: Callable[[D], I],
+        objective_function: Callable[[int | float], int | float],
         kind: ProblemKind,
-        search_space: tuple[D, D],
+        search_space: tuple[int | float, int | float],
         graph: Graph,
     ):
         self.objective_function = objective_function
@@ -26,13 +26,31 @@ class Problem[D, I]:
         self.search_space = search_space
         self.graph = graph
 
-    def value_at(self, solution: D) -> I:
-        """Returns the value of the solution in the point I"""
+    def value_at(self, solution: int | float) -> int | float:
+        """Returns the value of the solution in the point int | float"""
 
         return self.objective_function(solution)
 
+    def neighbors(self, solution: int | float) -> list[int | float]:
+        """Returns the neighbors of the solution"""
 
-class LocalSearch[D, I]:
+        return self.graph.neighbors(solution)
+
+    def best_neighbor(self, solution: int | float) -> int | float:
+        """Returns the best neighbor of the solution"""
+
+        neighbors = self.neighbors(solution)
+        neighbor_values = [self.value_at(neighbor) for neighbor in neighbors]
+
+        if self.kind == Problem.ProblemKind.MAXIMIZATION:
+            return max(neighbor_values, key=self.value_at)
+        elif self.kind == Problem.ProblemKind.MINIMIZATION:
+            return min(neighbor_values, key=self.value_at)
+        else:
+            raise Exception("Invalid problem kind")
+
+
+class LocalSearch:
     """A generic local search algorithm"""
 
     class N_OPT(Enum):
@@ -40,11 +58,13 @@ class LocalSearch[D, I]:
         THREE_OPT = 3
 
     def __init__(
-        self, problem: Problem[D, I], max_iterations=1000, n_opt=N_OPT.TWO_OPT
+        self, problem: Problem, neighborhood_size: int, max_iterations=1000, n_opt=N_OPT.TWO_OPT
     ):
         self.max_iterations = max_iterations
         self.problem = problem
         self.last_solutions = DroppingStack(max_size=5)
+        self.neighborhood_size = neighborhood_size
+        self.n_opt = n_opt
 
     def stopping_criterion(self, iteration: int) -> bool:
         """Returns whether the local search should stop or not. True means stop, False means continue."""
@@ -67,7 +87,7 @@ class LocalSearch[D, I]:
         # If the maximum number of iterations has been reached.
         return iteration >= self.max_iterations
 
-    def run(self, initial_solution: D):
+    def run(self, initial_solution: int | float):
         """Runs the local search algorithm for the problem"""
 
         # Initialize the solution.
@@ -84,13 +104,10 @@ class LocalSearch[D, I]:
 
         # While the stopping criterion is not met.
         while not self.stopping_criterion(iteration):
-            # Get the neighbors of the current solution.
-            neighbors = self.problem.neighbors(solution)
+            # Get the best neighbor  of the current solution.
+            best_neighbor = self.problem.best_neighbor(solution)
 
-            # Get the best neighbor.
-            best_neighbor = self.best_neighbor(neighbors)
-
-            # Get the best neighbor value.
+            # Get the value of the best neighbor value.
             best_neighbor_value = self.problem.value_at(best_neighbor)
 
             # If the best neighbor is better than the current solution.
@@ -106,7 +123,7 @@ class LocalSearch[D, I]:
                 # Update the solution.
                 solution = best_neighbor
 
-            # Increment the iteration.
+            # Increment the iteration counter.
             iteration += 1
 
         # Return the best solution.
