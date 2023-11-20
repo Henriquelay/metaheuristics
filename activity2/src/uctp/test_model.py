@@ -5,7 +5,7 @@ from pprint import pprint
 from typing import Any
 
 from pytest import raises
-from uctp.model import UCTP, Constraint
+from uctp.model import TIME_SLOT_SEPARATOR, UCTP, Constraint
 
 TOY_INSTANCE = """Name: Toy
 Courses: 4
@@ -139,6 +139,17 @@ def test_UCTP_graph():
     nodes: dict[str, dict[str, Any]] = {node[0]: node[1] for node in nodes_data}
     pprint(nodes)
 
+    # "course" colored nodes must exist
+    assert len(
+        {node for node in nodes if nodes[node]["color"] == problem.Colors.COURSE}
+    ) == len(problem.courses)
+
+    # "room-day-period" colored nodes must exist
+    assert (
+        len({node for node in nodes if nodes[node]["color"] == problem.Colors.ROOM})
+        == len(problem.rooms) * problem.days * problem.periods_per_day
+    )
+
     for node in nodes:
         # All nodes must have a color
         assert "color" in nodes[node]
@@ -148,31 +159,14 @@ def test_UCTP_graph():
             print(neighbor)
             assert nodes[node]["color"] != nodes[neighbor]["color"]
 
-        if nodes[node]["color"] == "course":
-            # Course nodes must be connected to curriculum nodes which have the said course.
-            curricula_with_course = {
-                curriculum
-                for curriculum in problem.curricula.values()
-                if node in curriculum.courses
-            }
-            curricula_name_with_course = {
-                curriculum.name
-                for curriculum in curricula_with_course
-            }
-            course_node_curricula = {
-                neighbor
-                for neighbor in graph.neighbors(node)
-                if nodes[neighbor]["color"] == "curriculum"
-            }
-            assert curricula_name_with_course == course_node_curricula
-
-            # Course nodes must be connected to no room nodes.
+        if nodes[node]["color"] == problem.Colors.COURSE:
+            # Course nodes must be intially connected to no room nodes.
             assert (
                 len(
                     {
                         neighbor
                         for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "room"
+                        if nodes[neighbor]["color"] == "room-day-period"
                     }
                 )
                 == 0
@@ -183,91 +177,9 @@ def test_UCTP_graph():
             assert len(expected_course) == 1
             expected_course = expected_course.pop()
 
-            teacher_nodes = [
-                neighbor
-                for neighbor in graph.neighbors(node)
-                if nodes[neighbor]["color"] == "teacher"
-            ]
-            assert len(teacher_nodes) == 1
-            teacher_node = teacher_nodes[0]
-            assert expected_course.teacher == teacher_node
-
-        elif nodes[node]["color"] == "curriculum":
-            # Curriculum nodes must be connected to course nodes which are in the curriculum.
-            curriculum = problem.curricula[node]
-            course_nodes = {
-                neighbor
-                for neighbor in graph.neighbors(node)
-                if nodes[neighbor]["color"] == "course"
-            }
-            assert len(curriculum.courses) == len(course_nodes)
-            assert {course.name for course in curriculum.courses.values()} == {
-                problem.courses[node].name for node in course_nodes
-            }
-
-            # Curriculum nodes must be connected to no room nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "room"
-                    }
-                )
-                == 0
-            )
-
-            # Curriculum nodes must be connected to no teacher nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "teacher"
-                    }
-                )
-                == 0
-            )
-        
-        elif nodes[node]["color"] == "teacher":
-            # Teacher should exist in the problem
-            assert node in problem.teachers
-
-            # Teacher nodes must be connected to course nodes
-            course_nodes = {
-                neighbor
-                for neighbor in graph.neighbors(node)
-                if nodes[neighbor]["color"] == "course"
-            }
-            assert len(course_nodes) > 0
-
-            # Teacher nodes must be connected to no room nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "room"
-                    }
-                )
-                == 0
-            )
-
-            # Teacher nodes must be connected to no curriculum nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "curriculum"
-                    }
-                )
-                == 0
-            )
-
-        elif nodes[node]["color"] == "room":
+        elif nodes[node]["color"] == problem.Colors.ROOM:
             # Room should exist in the problem
-            assert node.split()[0] in problem.rooms.keys()
+            assert node.split(TIME_SLOT_SEPARATOR)[0] in problem.rooms.keys()
 
             # Room nodes must be connected to no course nodes.
             assert (
@@ -305,6 +217,13 @@ def test_UCTP_graph():
                 == 0
             )
 
+        else:
+            # Other nodes must not exist
+            print(node)
+            print(nodes[node])
+            assert False
+
+
 class TestEvaluation:
     def test_evaluation_hard_constraints(self):
         """Asserts that the solution evaluation is correct"""
@@ -317,49 +236,49 @@ class TestEvaluation:
 
         # A valid solution
         solution = {
-            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
-            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
-            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
-            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert evaluate(solution) is not None
+        assert evaluate(solution) == 0
 
         # A solution with a course in an unavailable period
         solution = {
-            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 3)],
-            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
-            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 0)],
-            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 3)],
+            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 0)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
         with raises(ValueError, match="H4 violated"):
             evaluate(solution)
 
         # Two lectures of the same course in the same day-period
         solution = {
-            "SceCosC":  [("rA", 0, 0), ("rA", 0, 0), ("rA", 2, 0)],
-            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
-            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
-            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+            "SceCosC": [("rA", 0, 0), ("rA", 0, 0), ("rA", 2, 0)],
+            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
         with raises(ValueError, match="H1 violated"):
             evaluate(solution)
 
         # Two courses in the same room at the same time
         solution = {
-            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
-            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
-            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
-            "GeoTec":   [("rA", 0, 0), ("rC", 1, 3), ("rC", 2, 3)],
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec": [("rA", 0, 0), ("rC", 1, 3), ("rC", 2, 3)],
         }
         with raises(ValueError, match="H2 violated"):
             evaluate(solution)
 
         # Two courses of the same curriculum in the same day-period
         solution = {
-            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
-            "ArcTec":   [("rB", 0, 0), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
-            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
-            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec": [("rB", 0, 0), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
         with raises(ValueError, match="H3 violated"):
             evaluate(solution)
@@ -370,16 +289,14 @@ class TestEvaluation:
         problem = UCTP.parse(TOY_INSTANCE.splitlines())
 
         # Weights for soft constraints
-        weights = (0, 0, 0, 0)
+        weights = (4, 3, 2, 1)
         evaluate = lambda solution: problem.evaluate(solution, weights)
 
-        # A valid solution
+        # A optimal solution
         solution = {
-            "SceCosC":  [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
-            "ArcTec":   [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
-            "TecCos":   [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
-            "GeoTec":   [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert evaluate(solution) == 0 
-
-        
+        assert evaluate(solution) == 0

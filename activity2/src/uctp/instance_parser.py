@@ -1,13 +1,16 @@
+"""Atomic element parsing for the UCTP instance definition."""
+
+
 from typing import Sequence
 
 
 def parse(path: str):
     """Parses a whole instance definition that lives in the system file path given."""
-
-    from uctp.model import UCTP
+    # This avoids circular imports
+    from uctp.model import UCTP  # pylint: disable=import-outside-toplevel
 
     problem_instance = None
-    with open(path) as file:
+    with open(path, encoding="utf8") as file:
         lines = file.readlines()
         problem_instance = UCTP.parse(lines)
     file.close()
@@ -22,14 +25,12 @@ def skip_white_lines(body: Sequence[str]) -> Sequence[str]:
     return body
 
 
-def keyword(line: str, keyword: str) -> str:
+def keyword(line: str, tag: str) -> str:
     """Parses a keyword from a line, removing it from the line."""
 
-    if not line.startswith(keyword):
-        raise Exception(
-            f"Expected keyword {keyword!r} but found {line[:len(keyword)]!r}."
-        )
-    return line[len(keyword) :]
+    if not line.startswith(tag):
+        raise ValueError(f"Expected keyword {tag!r} but found {line[:len(tag)]!r}.")
+    return line[len(tag) :]
 
 
 def parse_word(line: str) -> tuple[str, str]:
@@ -53,5 +54,5 @@ def parse_end(line: str) -> tuple[None, str]:
     """Parses the end of the instance definition."""
 
     if line != "END.":
-        raise Exception("Unexpected end of instance definition.")
+        raise ValueError("Unexpected end of instance definition.")
     return None, ""
