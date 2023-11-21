@@ -320,6 +320,6 @@ class TestEvaluation:
             "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
             "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
-            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+            "GeoTec": [("rA", 0, 3), ("rA", 1, 3), ("rA", 2, 3)],
         }
-        assert self.problem.evaluate(solution, weights) == 7
+        assert self.problem.evaluate(solution, weights) == self.soft_weights[1] * 2
