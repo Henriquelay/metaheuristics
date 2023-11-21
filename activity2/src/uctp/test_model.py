@@ -243,7 +243,7 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert self.problem.evaluate(solution, weights) == 0
+        assert self.problem.evaluate(solution, weights)[0] == 0
 
     def test_evaluation_hard_constraints_h1(self):
         """Asserts that the solution evaluation is correct for solution that violates hard constraint H1"""
@@ -257,7 +257,7 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert self.problem.evaluate(solution, weights) == self.hard_weights[0]
+        assert self.problem.evaluate(solution, weights)[0] == self.hard_weights[0]
 
         # Two lectures of the same course in the same day-period
         solution = {
@@ -266,7 +266,7 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert self.problem.evaluate(solution, weights) == self.hard_weights[0]
+        assert self.problem.evaluate(solution, weights)[0] == self.hard_weights[0]
 
     def test_evaluation_hard_constraints_h2(self):
         """Asserts that the solution evaluation is correct for solution that violates hard constraint H2"""
@@ -280,7 +280,7 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rA", 2, 0)],
         }
-        assert self.problem.evaluate(solution, weights) == self.hard_weights[1]
+        assert self.problem.evaluate(solution, weights)[0] == self.hard_weights[1]
 
     def test_evaluation_hard_constraints_h3(self):
         """Asserts that the solution evaluation is correct for solution that violates hard constraint H3"""
@@ -294,7 +294,7 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert self.problem.evaluate(solution, weights) == self.hard_weights[2]
+        assert self.problem.evaluate(solution, weights)[0] == self.hard_weights[2]
 
     def test_evaluation_hard_constraints_h4(self):
         """Asserts that the solution evaluation is correct for solution that violates hard constraint H4"""
@@ -308,7 +308,7 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert self.problem.evaluate(solution, weights) == self.hard_weights[3]
+        assert self.problem.evaluate(solution, weights)[0] == self.hard_weights[3]
 
     def test_evaluation_soft_constraints(self):
         """Asserts that the solution evaluation is correct for a valid solution with soft constraints weights"""
@@ -322,4 +322,7 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rA", 1, 3), ("rA", 2, 3)],
         }
-        assert self.problem.evaluate(solution, weights) == self.soft_weights[1] * 2
+        assert self.problem.evaluate(solution, weights) == (
+            self.soft_weights[1] * 2,
+            {"S2"},
+        )

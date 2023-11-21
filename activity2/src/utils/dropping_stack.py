@@ -33,6 +33,10 @@ class DroppingStack[T]:
         """Returns whether the stack is full or not"""
         return len(self.stack) == self.max_size
 
+    def clear(self):
+        """Clears the stack"""
+        self.stack.clear()
+
     def __len__(self) -> int:
         return len(self.stack)
 

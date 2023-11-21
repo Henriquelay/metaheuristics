@@ -1,3 +1,5 @@
+"""Test the DroppingStack class"""
+
 from utils.dropping_stack import DroppingStack
 
 
