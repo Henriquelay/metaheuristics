@@ -5,7 +5,6 @@ from pprint import pprint
 from local_search.local_search import GuidedLocalSearch
 
 from uctp.instance_parser import parse_file
-from uctp.model import UCTP
 
 INSTANCES_FOLDER = "instances/test/"
 
