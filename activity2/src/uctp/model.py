@@ -307,7 +307,12 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 
         return base_graph
 
-    def evaluate(
+    def best_neighbor(self, solution: Graph, neighborhood_size: int) -> Graph:
+        """Generates graphs neighboring the passed solution, and returns the best one."""
+        # TODO 
+        return solution
+
+    def evaluate_dict(
         self,
         solution_dict: dict[str, list[tuple[str, int, int]]],
         weights: tuple[
@@ -315,9 +320,18 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         ],
     ) -> tuple[float, set[str]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
-        # TODO convert to matrix representation evaluation
+        graph = self.solution_to_graph(solution_dict)
+        return self.evaluate(graph, weights)
 
-        solution = self.solution_to_graph(solution_dict)
+    def evaluate(
+        self,
+        solution: Graph,
+        weights: tuple[
+            tuple[float, float, float, float], tuple[float, float, float, float]
+        ],
+    ) -> tuple[float, set[str]]:
+        """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
+        # TODO convert to matrix representation evaluation
 
         nodes_data = solution.nodes.data()
         # nodes: dict[str, dict[str, Any]] = {node: data for node, data in nodes_data}

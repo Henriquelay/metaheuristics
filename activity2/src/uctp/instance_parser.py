@@ -4,7 +4,7 @@
 from typing import Sequence
 
 
-def parse(path: str):
+def parse_file(path: str):
     """Parses a whole instance definition that lives in the system file path given."""
     # This avoids circular imports
     from uctp.model import UCTP  # pylint: disable=import-outside-toplevel

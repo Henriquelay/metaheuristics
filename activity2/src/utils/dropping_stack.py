@@ -1,6 +1,9 @@
 """A limited-size stack that drops the oldest element when it is full"""
 
+from ast import TypeVar
 from typing import Iterator
+
+T = TypeVar("T", covariant=True)
 
 
 class DroppingStack[T]:
