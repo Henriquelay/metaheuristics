@@ -1,3 +1,5 @@
+"""A limited-size stack that drops the oldest element when it is full"""
+
 from typing import Iterator
 
 

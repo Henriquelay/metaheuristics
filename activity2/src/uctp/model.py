@@ -14,6 +14,12 @@ from uctp.instance_parser import parse_int, parse_word, skip_white_lines, keywor
 TIME_SLOT_SEPARATOR = "-"
 
 
+def format_room_period_name(room: str, day: int, period: int) -> str:
+    """Returns a string representing a room-day-period."""
+
+    return f"{room}{TIME_SLOT_SEPARATOR}{day}{TIME_SLOT_SEPARATOR}{period}"
+
+
 class Room:
     """A room in the university."""
 
@@ -266,25 +272,23 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         """Returns a graph base representation of the problem, with no solutions drawn."""
 
         graph = Graph()
-        for curriculum in self.curricula.values():
-            for course in curriculum.courses.values():
-                try:
-                    graph.nodes[course.name]
-                except KeyError:
-                    # add course to graph
-                    graph.add_node(
-                        course.name,
-                        color=self.Colors.COURSE,
-                    )
+        for course in self.courses:
+            # add course to graph
+            graph.add_node(
+                course,
+                color=self.Colors.COURSE,
+            )
 
-        for room in self.rooms.values():
-            for day in range(self.days):
-                for period in range(self.periods_per_day):
-                    graph.add_node(
-                        f"{room.name}{TIME_SLOT_SEPARATOR}{day}{TIME_SLOT_SEPARATOR}{period}",
-                        color=self.Colors.ROOM,
-                        capacity=room.capacity,
-                    )
+        for node_name in [
+            format_room_period_name(room.name, day, period)
+            for room in self.rooms.values()
+            for day in range(self.days)
+            for period in range(self.periods_per_day)
+        ]:
+            graph.add_node(
+                node_name,
+                color=self.Colors.ROOM,
+            )
 
         return graph
 
@@ -295,11 +299,12 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 
         base_graph = self.to_graph()
 
-        for course, lectures in solution.items():
-            for room, day, period in lectures:
+        for course, room_time_slots in solution.items():
+            for room, day, period in room_time_slots:
+                # pprint((course, format_room_period_name(room, day, period)))
                 base_graph.add_edge(
                     course,
-                    f"{room}{TIME_SLOT_SEPARATOR}{day}{TIME_SLOT_SEPARATOR}{period}",
+                    format_room_period_name(room, day, period),
                 )
 
         return base_graph
@@ -307,124 +312,100 @@ Constraints = {[v.__str__() for v in self.constraints]}\
     def evaluate(
         self,
         solution_dict: dict[str, list[tuple[str, int, int]]],
-        weights: tuple[float, float, float, float],
+        weights: tuple[
+            tuple[float, float, float, float], tuple[float, float, float, float]
+        ],
     ) -> float:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
+        # TODO convert to matrix representation evaluation
 
         solution = self.solution_to_graph(solution_dict)
 
         nodes_data = solution.nodes.data()
-        nodes: dict[str, dict[str, Any]] = {node: data for node, data in nodes_data}
+        # nodes: dict[str, dict[str, Any]] = {node: data for node, data in nodes_data}
+
+        # List of Rooms and timeslots assigned to each course
+        course_timeslots: dict[str, list[tuple[Room, int, int]]] = {}
+        # List of timeslots assigned to each teacher
+        teacher_timeslots: dict[str, list[tuple[int, int]]] = {}
+        # List of courses assigned to each timeslot
+        timeslot_courses: dict[tuple[int, int], list[tuple[Room, Course]]] = {}
+        curriculum_timeslots: dict[str, list[tuple[int, int]]] = {}
 
         score = 0.0
 
-        for node_name, node_data in nodes.items():
+        for node_name, node_data in nodes_data:
             if node_data["color"] == self.Colors.COURSE:
                 course = self.courses[node_name]
-                time_slots: list[tuple[str, int, int]] = [
-                    (
-                        slot.split(TIME_SLOT_SEPARATOR)[0],
-                        int(slot.split(TIME_SLOT_SEPARATOR)[1]),
-                        int(slot.split(TIME_SLOT_SEPARATOR)[2]),
-                    )
-                    for slot in solution.neighbors(node_name)
+                course_curricula = [
+                    curriculum
+                    for curriculum in self.curricula.values()
+                    if course.name in curriculum.courses.keys()
                 ]
+                timeslots: list[str] = list(solution.neighbors(course.name))
+                for timeslot in timeslots:
+                    (room, day, period) = timeslot.split(TIME_SLOT_SEPARATOR)
+                    day = int(day)
+                    period = int(period)
+                    room = self.rooms[room]
 
-                # H1 All lectures of a course must be alocated, and in different periods.
-                # This means that the number of edges between courses and room-periods must be equal to the number of lectures of the course.
-                if len(time_slots) != course.lectures:
-                    raise ValueError(
-                        "Invalid solution. H1 violated due to count of lectures not equal to count of room-day-periods."
-                    )
-
-                assigned_rooms: set[str] = set()
-                assigned_time_slots: set[tuple[int, int]] = set()
-                for room, day, period in time_slots:
-                    # H4 if a course is assigned to slot that it is unavailable, then the solution is infeasible.
-                    # This means that the number of edges between courses and day-periods to which it is unavailable must be equal to 0.
-                    if (day, period) in course.constraints:
-                        raise ValueError(
-                            "Invalid solution. H4 violated due to course assigned in an unavailable slot."
-                        )
-
-                    if room not in assigned_rooms:
-                        # S1: Room capacity, For each course, the number of students that attend the course must be less than or equal  to the capacity of the room. Each student above the capacity of the room is a violation.
-                        room_capacity = self.rooms[room].capacity
-                        if course.students > room_capacity:
-                            score += weights[0] * (course.students - room_capacity)
-                        assigned_rooms.add(room)
-
-                    if (day, period) in assigned_time_slots:
-                        raise ValueError(
-                            "Invalid solution. H1 violated due to course assigned in two different rooms in the same day-period."
-                        )
-                    assigned_time_slots.add((day, period))
-
-                # S4: Room stability, For each course, the number of different rooms in which the course is taught must be as closely as possible to 1. For each course, there is a violation for every room in which the course is taught, except the first one.
-                score += weights[3] * (len(assigned_rooms) - 1)
-
-                # S2: Minimum working days, For each course, the number of days in which the course is taught must be greater than or equal to the minimum working days of the course. Each day below the minimum working days of the course is a violation.
-                days_assigned = len(set([day for room, day, period in time_slots]))
-                if days_assigned < course.min_working_days:
-                    score += weights[1] * (course.min_working_days - days_assigned)
-
-            # H2 Two courses cannot be allocated in the same room-period.
-            # This means that the number of edges between room-periods and courses must be less than or equal to 1.
-            elif node_data["color"] == self.Colors.ROOM:
-                (room, day, period) = node_name.split(TIME_SLOT_SEPARATOR)
-                day = int(day)
-                period = int(period)
-                assigned_courses: list[str] = list(solution.neighbors(node_name))
-                teacher_periods: dict[str, list[tuple[int, int]]] = {}
-                if len(assigned_courses) > 1:
-                    raise ValueError(
-                        "Invalid solution. H2 violated due to two courses assigned in the same room-day-period."
-                    )
-                elif len(assigned_courses) == 1:
-                    assigned_course = self.courses[assigned_courses[0]]
-                    # H3 All courses from the same curricula, or teached by the same teacher must be allocated in different periods.
-                    # This means that the number of edges between courses of a teacher or curricula to periods must never overlap day-periods.
-                    teacher = assigned_course.teacher
-                    if teacher not in teacher_periods:
-                        teacher_periods[teacher] = [(day, period)]
-                    elif (day, period) in teacher_periods[teacher]:
-                        raise ValueError(
-                            "Invalid solution. H3 violated due to two courses teached by the same teacher in the same day-period."
-                        )
+                    if course.name not in course_timeslots:
+                        course_timeslots[course.name] = [(room, day, period)]
                     else:
-                        teacher_periods[teacher].append((day, period))
+                        course_timeslots[course.name].append((room, day, period))
 
-            # S3: Curriculum compactness, For each curriculum, the number of periods in a day in which the courses of the curriculum are taught must be as closely as possible. For each curriculum, there is a violation for every course which is not adjacent to another course of the same curriculum in the same day.
-            for _ in self.curricula.values():
-                assigned_slots_curriculum: dict[int, list[int]] = {}
-                for course in self.courses.values():
-                    for neighbor in solution.neighbors(course.name):
-                        [
-                            _room_name,
-                            room_day,
-                            room_period,
-                        ] = neighbor.split(TIME_SLOT_SEPARATOR)
-                        room_day = int(room_day)
-                        room_period = int(room_period)
-                        if room_day not in assigned_slots_curriculum:
-                            assigned_slots_curriculum[room_day] = [room_period]
+                    if course.teacher not in teacher_timeslots:
+                        teacher_timeslots[course.teacher] = [(day, period)]
+                    else:
+                        teacher_timeslots[course.teacher].append((day, period))
+
+                    if (day, period) not in timeslot_courses:
+                        timeslot_courses[(day, period)] = [(room, course)]
+                    else:
+                        timeslot_courses[(day, period)].append((room, course))
+
+                    for curriculum in course_curricula:
+                        if curriculum.name not in curriculum_timeslots:
+                            curriculum_timeslots[curriculum.name] = [(day, period)]
                         else:
-                            # H3 All courses from the same curricula, or teached by the same teacher must be allocated in different periods.
-                            if room_period not in assigned_slots_curriculum[room_day]:
-                                assigned_slots_curriculum[room_day].append(room_period)
-                            else:
-                                pprint((room_day, room_period))
-                                pprint(assigned_slots_curriculum)
-                                raise ValueError(
-                                    "Invalid solution. H3 violated due to course in the same curriculum being teached at the same day-period."
-                                )
+                            curriculum_timeslots[curriculum.name].append((day, period))
 
-                # This means that if there are courses in the same curriculum that are not adjacent in the same day, then there is a violation.
-                for day, periods in assigned_slots_curriculum.items():
-                    periods.sort()
-                    for i in range(len(periods) - 1):
-                        if periods[i + 1] - periods[i] > 1:
-                            score += weights[2]
+            elif node_data["color"] == self.Colors.ROOM:
+                pass
+            else:
+                raise ValueError(f"Invalid node color: {node_data['color']}")
+
+        for course, periods in course_timeslots.items():
+            course = self.courses[course]
+
+            # H1 - Lectures: All lectures of a course must be alocated, and in  different periods. Each lecture not allocated is a violation. Each lecture more than one allocated on the same period is also a violation.
+            # if some lecture is not allocated, then there is a violation
+            if len(periods) < course.lectures:
+                score += weights[0][0] * (course.lectures - len(periods))
+
+            # if lectures are allocated in the same period, then there is a violation
+            periods_stripped_room = [(day, period) for _, day, period in periods]
+            score += weights[0][0] * (len(periods_stripped_room) - len(set(periods_stripped_room)))
+
+            # H4 - Unavailability: If a course is assigned to slot that it is unavailable, It is a violation.
+            constraints = {
+                (constraint.day, constraint.period) for constraint in course.constraints
+            }
+            intersection = constraints.intersection(set(periods_stripped_room))
+            score += weights[0][3] * len(intersection)
+
+        # H3 - Conflits: Lectures of courses in the same curriculum, or teached by the same teacher must be allocated in different periods. Each lecture allocated in the same period is a violation.
+        for periods in teacher_timeslots.values():
+            score += weights[0][2] * (len(periods) - len(set(periods)))
+
+        for periods in curriculum_timeslots.values():
+            score += weights[0][2] * (len(periods) - len(set(periods)))
+
+        # H2 - Room occupancy: Two lectures can't be allocated in the same room-period. Each extra lecture allocated in the same room-period is a violation.
+        for timeslot, room_courses in timeslot_courses.items():
+            # If Room repeats in the list, then there is a violation
+            rooms = [room for room, _ in room_courses]
+            score += weights[0][1] * (len(rooms) - len(set(rooms)))
 
         return score
 

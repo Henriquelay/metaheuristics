@@ -225,14 +225,16 @@ def test_UCTP_graph():
 
 
 class TestEvaluation:
-    def test_evaluation_hard_constraints(self):
-        """Asserts that the solution evaluation is correct"""
+    """Tests for the evaluation of a solution"""
 
-        problem = UCTP.parse(TOY_INSTANCE.splitlines())
+    hard_weights = (10, 11, 12, 13)
+    soft_weights = (4, 3, 2, 1)
+    problem = UCTP.parse(TOY_INSTANCE.splitlines())
 
-        # Weights for soft constraints
-        weights = (0, 0, 0, 0)
-        evaluate = lambda solution: problem.evaluate(solution, weights)
+    def test_evaluation_hard_constraints_ok(self):
+        """Asserts that the solution evaluation is correct for a valid solution"""
+
+        weights = (self.hard_weights, (0, 0, 0, 0))
 
         # A valid solution
         solution = {
@@ -241,37 +243,49 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert evaluate(solution) == 0
+        assert self.problem.evaluate(solution, weights) == 0
 
-        # A solution with a course in an unavailable period
-        solution = {
-            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 3)],
-            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
-            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 0)],
-            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
-        }
-        with raises(ValueError, match="H4 violated"):
-            evaluate(solution)
+    def test_evaluation_hard_constraints_h1(self):
+        """Asserts that the solution evaluation is correct for solution that violates hard constraint H1"""
 
-        # Two lectures of the same course in the same day-period
+        weights = (self.hard_weights, (0, 0, 0, 0))
+
+        # Missing a lecture
         solution = {
-            "SceCosC": [("rA", 0, 0), ("rA", 0, 0), ("rA", 2, 0)],
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0)],
             "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        with raises(ValueError, match="H1 violated"):
-            evaluate(solution)
+        assert self.problem.evaluate(solution, weights) == self.hard_weights[0]
 
-        # Two courses in the same room at the same time
+        # Two lectures of the same course in the same day-period
+        solution = {
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 1, 0)],
+            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        assert self.problem.evaluate(solution, weights) == self.hard_weights[0]
+
+    def test_evaluation_hard_constraints_h2(self):
+        """Asserts that the solution evaluation is correct for solution that violates hard constraint H2"""
+
+        weights = (self.hard_weights, (0, 0, 0, 0))
+
+        # Two courses in the same room at the same time, different curriculum
         solution = {
             "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
             "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
-            "GeoTec": [("rA", 0, 0), ("rC", 1, 3), ("rC", 2, 3)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rA", 2, 0)],
         }
-        with raises(ValueError, match="H2 violated"):
-            evaluate(solution)
+        assert self.problem.evaluate(solution, weights) == self.hard_weights[1]
+
+    def test_evaluation_hard_constraints_h3(self):
+        """Asserts that the solution evaluation is correct for solution that violates hard constraint H3"""
+
+        weights = (self.hard_weights, (0, 0, 0, 0))
 
         # Two courses of the same curriculum in the same day-period
         solution = {
@@ -280,17 +294,26 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        with raises(ValueError, match="H3 violated"):
-            evaluate(solution)
+        assert self.problem.evaluate(solution, weights) == self.hard_weights[2]
+
+    def test_evaluation_hard_constraints_h4(self):
+        """Asserts that the solution evaluation is correct for solution that violates hard constraint H4"""
+
+        weights = (self.hard_weights, (0, 0, 0, 0))
+
+        # A solution with a course in an unavailable period
+        solution = {
+            "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+            "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 4, 0)],
+            "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+            "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+        }
+        assert self.problem.evaluate(solution, weights) == self.hard_weights[3]
 
     def test_evaluation_soft_constraints(self):
-        """Asserts that the solution evaluation is correct"""
+        """Asserts that the solution evaluation is correct for a valid solution with soft constraints weights"""
 
-        problem = UCTP.parse(TOY_INSTANCE.splitlines())
-
-        # Weights for soft constraints
-        weights = (4, 3, 2, 1)
-        evaluate = lambda solution: problem.evaluate(solution, weights)
+        weights = ((0, 0, 0, 0), self.soft_weights)
 
         # A optimal solution
         solution = {
@@ -299,4 +322,4 @@ class TestEvaluation:
             "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
             "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
         }
-        assert evaluate(solution) == 0
+        assert self.problem.evaluate(solution, weights) == 7

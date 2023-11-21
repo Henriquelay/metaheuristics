@@ -2,6 +2,8 @@ from utils.dropping_stack import DroppingStack
 
 
 def test_more_than_max_size():
+    """Test that the stack drops the oldest element when it is full"""
+
     stack = DroppingStack(max_size=5)
     for i in range(1, 7):
         stack.push(i)
@@ -12,6 +14,8 @@ def test_more_than_max_size():
 
 
 def test_len_works():
+    """Test that the len is consistent with the stack size"""
+
     stack = DroppingStack(max_size=5)
     assert len(stack) == 0
     for i in range(1, 7):
@@ -20,6 +24,7 @@ def test_len_works():
 
 
 def test_getitem_works():
+    """Test that getitem works"""
     stack = DroppingStack(max_size=5)
     for i in range(1, 7):
         stack.push(i)
