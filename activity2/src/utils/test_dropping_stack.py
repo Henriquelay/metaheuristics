@@ -10,7 +10,7 @@ def test_more_than_max_size():
     for i in range(1, 7):
         stack.push(i)
 
-    result = [item for item in stack.stack]
+    result = stack.stack
 
     assert result == [2, 3, 4, 5, 6]
 

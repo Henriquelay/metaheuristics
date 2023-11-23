@@ -1,13 +1,11 @@
 """A generic local search algorithm in graphs."""
 
 from __future__ import annotations
-from pprint import pprint
-
-from typing import Callable, Sequence
+from collections import defaultdict
+from typing import Callable
 from enum import Enum
 
-from networkx import Graph
-from uctp.model import UCTP
+from uctp.model import UCTP, Solution, Weights
 
 from utils.dropping_stack import DroppingStack
 
@@ -61,7 +59,7 @@ class LocalSearch:
 
     def search(
         self,
-        initial_solution: Graph,
+        initial_solution: Solution,
         max_iterations: int,
         problem: UCTP,
         weights: tuple[
@@ -121,74 +119,62 @@ class GuidedLocalSearch(LocalSearch):
         llambda=0.3,
         alpha=1 / 4,
     ):
-        self.penalties: dict[str, int] = {}
+        self.penalties: dict[str, int] = defaultdict(int)
         self.llambda = llambda
         self.alpha = alpha
 
-        # # Replacing the objective function with the augmented one
-        # if problem.kind == Problem.ProblemKind.MAXIMIZATION:
-        #     problem.objective_function = lambda x: self.original_objective_function(
-        #         x
-        #     ) - self.objective_function_augmentation(x, alpha, llambda)
-
-        # elif problem.kind == Problem.ProblemKind.MINIMIZATION:
-        #     problem.objective_function = lambda x: self.original_objective_function(
-        #         x
-        #     ) + self.objective_function_augmentation(x, alpha, llambda)
-
-        # else:
-        #     raise ValueError("Invalid problem kind")
-
         super().__init__(neighborhood_size)
+
+    def augmentation_factor(
+        self,
+        properties: list[str],
+        llambda: float,
+        _alpha: float,
+    ) -> float:
+        """Augments the passed objetive function with the heuristic information"""
+
+        augmentation = (
+            llambda
+            # TODO play with alpha
+            # * alpha
+            * sum(self.penalties[prop] for prop in properties)
+        )
+
+        # Update the penalties for the properties of the found optima
+        for prop in properties:
+            self.penalties[prop] += 1
+
+        return augmentation
+
+    def augmented_objective_function(
+        self,
+        solution: Solution,
+        weights: Weights,
+        original_objective_function: Callable[
+            [Solution, Weights], tuple[float, list[str]]
+        ],
+    ) -> tuple[float, list[str]]:
+        """Augments the passed objetive function with the heuristic information"""
+
+        value, properties = original_objective_function(solution, weights)
+
+        return (
+            value + self.augmentation_factor(properties, self.llambda, self.alpha),
+            properties,
+        )
 
     def search(
         self,
-        initial_solution: Graph,
+        initial_solution: Solution,
         max_iterations: int,
         problem: UCTP,
-        weights: tuple[
-            tuple[float, float, float, float], tuple[float, float, float, float]
-        ],
+        weights: Weights,
     ):
         """Runs the local search algorithm for the problem"""
 
-        def augmented_objective_function(
-            self,
-            solution: Graph,
-            weights: tuple[
-                tuple[float, float, float, float], tuple[float, float, float, float]
-            ],
-            evaluation: Callable[
-                [
-                    Graph,
-                    tuple[
-                        tuple[float, float, float, float],
-                        tuple[float, float, float, float],
-                    ],
-                ],
-                tuple[float, set[str]],
-            ],
-            alpha: float,
-            llambda: float,
-        ) -> tuple[float, set[str]]:
-            """Augments the passed objetive function with the heuristic information"""
-            original_value, properties = evaluation(solution, weights)
-            augmentation = (
-                llambda
-                # * alpha
-                * sum([self.penalties.get(prop, 0) for prop in properties])
-            )
-
-            return (original_value + augmentation, properties)
-
         original_objective_function = problem.evaluate
-        problem.evaluate = lambda solution, weights: augmented_objective_function(
-            self,
-            solution,
-            weights,
-            original_objective_function,
-            self.alpha,
-            self.llambda,
+        problem.evaluate = lambda solution, weights: self.augmented_objective_function(
+            solution, weights, original_objective_function
         )
 
         iteration = 0
@@ -196,7 +182,7 @@ class GuidedLocalSearch(LocalSearch):
         current_solution = initial_solution
 
         best_solution = initial_solution
-        best_solution_value = original_objective_function(best_solution, weights)[0]
+        best_solution_value, _ = original_objective_function(best_solution, weights)
 
         last_solutions = DroppingStack(max_size=5)
 
@@ -207,7 +193,7 @@ class GuidedLocalSearch(LocalSearch):
             current_solution = super().search(
                 current_solution, max_iterations // 10, problem, weights
             )
-            current_solution_value, properties = original_objective_function(
+            current_solution_value, _ = original_objective_function(
                 current_solution, weights
             )
 
@@ -217,10 +203,5 @@ class GuidedLocalSearch(LocalSearch):
             if current_solution_value < best_solution_value:
                 best_solution = current_solution
                 best_solution_value = current_solution_value
-
-            # Updating the penalties for the properties of the found optima
-            for prop in properties:
-                # TODO utility function
-                self.penalties[prop] += 1
 
         return best_solution

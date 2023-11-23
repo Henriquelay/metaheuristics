@@ -27,6 +27,7 @@ class DroppingStack[T]:
         """Peeks the next element to be popped"""
         if self.stack:
             return self.stack[-1]
+        return None
 
     def is_empty(self) -> bool:
         """Returns whether the stack is empty or not"""

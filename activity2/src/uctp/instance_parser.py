@@ -4,19 +4,6 @@
 from typing import Sequence
 
 
-def parse_file(path: str):
-    """Parses a whole instance definition that lives in the system file path given."""
-    # This avoids circular imports
-    from uctp.model import UCTP  # pylint: disable=import-outside-toplevel
-
-    problem_instance = None
-    with open(path, encoding="utf8") as file:
-        lines = file.readlines()
-        problem_instance = UCTP.parse(lines)
-    file.close()
-    return problem_instance
-
-
 def skip_white_lines(body: Sequence[str]) -> Sequence[str]:
     """Removes all white lines from the beginning of the body."""
 

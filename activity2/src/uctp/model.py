@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 from collections import defaultdict
-from email.policy import default
 from enum import Enum
-from pprint import pprint
 
-from typing import Optional, Self, Sequence
+from typing import Self, Sequence
 from weakref import ref
 
-from networkx import Graph
-
 from uctp.instance_parser import parse_int, parse_word, skip_white_lines, keyword
-
-TIME_SLOT_SEPARATOR = "-"
 
 
 class Room:
@@ -145,6 +139,12 @@ class Curriculum:
 # Adjacency list of room_day_period -> course
 type Solution = list[list[int]]
 
+# Weights for the objective function
+# (H1, H2, H3, H4), (S1, S2, S3, S4)
+type Weights = tuple[
+    tuple[float, float, float, float], tuple[float, float, float, float]
+]
+
 
 class UCTP:
     """A University Course Timetabling Problem instance."""
@@ -270,6 +270,17 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             constraints,
         )
 
+    @classmethod
+    def from_file(cls, path: str) -> Self:
+        """Parses a whole instance definition that lives in the system file path given."""
+
+        problem_instance = None
+        with open(path, encoding="utf8") as file:
+            lines = file.readlines()
+            problem_instance = cls.parse(lines)
+        file.close()
+        return problem_instance
+
     def to_graph(self) -> Solution:
         """Returns a graph base representation of the problem, with no solutions drawn."""
 
@@ -305,14 +316,14 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         return base_solution
 
     @classmethod
-    def lecture_move(cls, solution: Graph) -> Graph:
+    def lecture_move(cls, solution: Solution) -> Solution:
         """Moves two random timeslots, regardless if there is a course there or not. It there is a course, it is moved to the other timeslot."""
         # TODO
         return solution
 
     def neighbors(
-        self, solution: Graph, neighborhood_size: int
-    ) -> set[tuple[Graph, float]]:
+        self, solution: Solution, neighborhood_size: int
+    ) -> set[tuple[Solution, float]]:
         """Generates graphs neighboring the passed solution. Also passes in the score of each solution."""
         # TODO
         return set()
@@ -320,10 +331,8 @@ Constraints = {[v.__str__() for v in self.constraints]}\
     def evaluate_dict(
         self,
         solution_dict: dict[str, list[tuple[str, int, int]]],
-        weights: tuple[
-            tuple[float, float, float, float], tuple[float, float, float, float]
-        ],
-    ) -> tuple[float, set[str]]:
+        weights: Weights,
+    ) -> tuple[float, list[str]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
         graph = self.solution_to_graph(solution_dict)
         return self.evaluate(graph, weights)
@@ -331,10 +340,8 @@ Constraints = {[v.__str__() for v in self.constraints]}\
     def evaluate(
         self,
         solution: Solution,
-        weights: tuple[
-            tuple[float, float, float, float], tuple[float, float, float, float]
-        ],
-    ) -> tuple[float, set[str]]:
+        weights: Weights,
+    ) -> tuple[float, list[str]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
 
         # List of Rooms and timeslots assigned to each course
@@ -381,7 +388,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 for curriculum in curricula:
                     curriculum_timeslots[curriculum.name].append((day, period))
 
-        properties: set[str] = set()
+        properties: list[str] = []
 
         score = 0.0
 
@@ -392,7 +399,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             # if some lecture is not allocated, then there is a violation
             if len(periods) < course.lectures:
                 score += weights[0][0] * (course.lectures - len(periods))
-                properties.add("H1")
+                properties.append("H1")
 
             # if lectures are allocated in the same period, then there is a violation
             periods_stripped_room = [(day, period) for _, day, period in periods]
@@ -400,7 +407,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 len(periods_stripped_room) - len(set(periods_stripped_room))
             )
             if len(periods_stripped_room) != len(set(periods_stripped_room)):
-                properties.add("H1")
+                properties.append("H1")
 
             # H4 - Unavailability: If a course is assigned to slot that it is unavailable, It is a violation.
             constraints = {
@@ -409,30 +416,30 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             intersection = constraints.intersection(set(periods_stripped_room))
             score += weights[0][3] * len(intersection)
             if len(intersection) > 0:
-                properties.add("H4")
+                properties.append("H4")
 
             # S2 - Minimum working days: The number of days where at least one lecture is scheduled must be greater or equal than the minimum working days of the course. Each day below the minimum is a violation.
             days = {day for day, _ in periods_stripped_room}
             if len(days) < course.min_working_days:
                 score += weights[1][1] * (course.min_working_days - len(days))
-                properties.add("S2")
+                properties.append("S2")
 
             # S4 - Room stability: All lectures of a course must be allocated in the same room. Each lecture not allocated in the same room is a violation.
             rooms_of_lecture = len({room for room, _, _ in periods})
             score += weights[1][3] * (rooms_of_lecture - 1)
             if rooms_of_lecture > 1:
-                properties.add("S4")
+                properties.append("S4")
 
         # H3 - Conflits: Lectures of courses in the same curriculum, or teached by the same teacher must be allocated in different periods. Each lecture allocated in the same period is a violation.
         for periods in teacher_timeslots.values():
             score += weights[0][2] * (len(periods) - len(set(periods)))
             if len(periods) != len(set(periods)):
-                properties.add("H3")
+                properties.append("H3")
 
         for periods in curriculum_timeslots.values():
             score += weights[0][2] * (len(periods) - len(set(periods)))
             if len(periods) != len(set(periods)):
-                properties.add("H3")
+                properties.append("H3")
 
             # S3 - Curriculum compactness: All lectures of a curriculum must have as few isolated lectures as possible. Each lecture that is not adjacent to another lecture in the same curriculum is a violation.
             in_gap = False
@@ -449,7 +456,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                     elif period > last_period + 1 and in_gap:
                         # Last period was a gap, and this is a gap too, so it's a violation
                         score += weights[1][2]
-                        properties.add("S3")
+                        properties.append("S3")
                     else:
                         in_gap = False
                 last_period = period
@@ -460,12 +467,12 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             rooms = [room for room, _ in room_courses]
             score += weights[0][1] * (len(rooms) - len(set(rooms)))
             if len(rooms) != len(set(rooms)):
-                properties.add("H2")
+                properties.append("H2")
 
             # S1 - Room capacity: The number of students in a room-period can't exceed the capacity of the room. Each student over the capacity is a violation.
             for room, course in room_courses:
                 if course.students > room.capacity:
                     score += weights[1][0] * (course.students - room.capacity)
-                    properties.add("S1")
+                    properties.append("S1")
 
         return (score, properties)

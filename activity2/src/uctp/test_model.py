@@ -1,12 +1,8 @@
-# pylint: disable=all
+"""Tests for the UCTP model"""
 
-from math import inf
 from pprint import pprint
-from typing import Any
 
-import pytest
-
-from uctp.model import TIME_SLOT_SEPARATOR, UCTP, Constraint
+from uctp.model import UCTP, Constraint
 
 TOY_INSTANCE = """Name: Toy
 Courses: 4
@@ -52,7 +48,7 @@ def test_parse_all_instances():
     print(instances)
 
     for path in instances:
-        with open(path, "r") as file:
+        with open(path, "r", encoding="utf8") as file:
             print(f"Parsing {path}")
             problem = UCTP.parse(file.readlines())
             assert problem.name is not None
@@ -64,7 +60,7 @@ def test_parse_all_instances():
         file.close()
 
 
-def test_UCTP_parsing():
+def test_uctp_parsing():
     """UCTP can parse toy intance successfully and no data is lost"""
 
     problem = UCTP.parse(TOY_INSTANCE.splitlines())
@@ -116,7 +112,7 @@ def test_UCTP_parsing():
     assert_constraint(problem.constraints[7], "ArcTec", 4, 3)
 
 
-def test_UCTP_graph():
+def test_uctp_graph():
     """Asserts graph generation for UCTP curricula"""
 
     problem = UCTP.parse(TOY_INSTANCE.splitlines())
@@ -128,7 +124,7 @@ def test_UCTP_graph():
     ]
 
 
-def test_UCTP_solution_drawing():
+def test_uctp_solution_drawing():
     """Asserts that the solution drawing is correct"""
 
     problem = UCTP.parse(TOY_INSTANCE.splitlines())
@@ -144,70 +140,68 @@ def test_UCTP_solution_drawing():
 
     pprint(drawing)
 
-    
     expected = [
         # SceCos; ArcTec; TecCos; GeoTec
-        [1, 0, 0, 0], # rA day 0 period 0
-        [0, 0, 0, 0], # rA day 0 period 1
-        [0, 0, 0, 0], # rA day 0 period 2
-        [0, 0, 0, 1], # rA day 0 period 3
-        [1, 0, 0, 0], # rA day 1 period 0
-        [0, 0, 0, 0], # rA day 1 period 1
-        [0, 0, 0, 0], # rA day 1 period 2
-        [0, 0, 0, 0], # rA day 1 period 3
-        [1, 0, 0, 0], # rA day 2 period 0
-        [0, 0, 0, 0], # rA day 2 period 1
-        [0, 0, 0, 0], # rA day 2 period 2
-        [0, 0, 0, 0], # rA day 2 period 3
-        [0, 0, 0, 0], # rA day 3 period 0
-        [0, 0, 0, 0], # rA day 3 period 1
-        [0, 0, 0, 0], # rA day 3 period 2
-        [0, 0, 0, 0], # rA day 3 period 3
-        [0, 0, 0, 0], # rA day 4 period 0
-        [0, 0, 0, 0], # rA day 4 period 1
-        [0, 0, 0, 0], # rA day 4 period 2
-        [0, 0, 0, 0], # rA day 4 period 3
-        [0, 0, 0, 0], # rB day 0 period 0
-        [0, 1, 0, 0], # rB day 0 period 1
-        [0, 0, 0, 0], # rB day 0 period 2
-        [0, 0, 0, 0], # rB day 0 period 3
-        [0, 0, 0, 0], # rB day 1 period 0
-        [0, 1, 0, 0], # rB day 1 period 1
-        [0, 0, 0, 0], # rB day 1 period 2
-        [0, 0, 0, 0], # rB day 1 period 3
-        [0, 0, 0, 0], # rB day 2 period 0
-        [0, 1, 0, 0], # rB day 2 period 1
-        [0, 0, 0, 0], # rB day 2 period 2
-        [0, 0, 0, 0], # rB day 2 period 3
-        [0, 0, 0, 0], # rB day 3 period 0
-        [0, 1, 0, 0], # rB day 3 period 1
-        [0, 0, 0, 0], # rB day 3 period 2
-        [0, 0, 0, 0], # rB day 3 period 3
-        [0, 0, 0, 0], # rB day 4 period 0
-        [0, 0, 0, 0], # rB day 4 period 1
-        [0, 0, 0, 0], # rB day 4 period 2
-        [0, 0, 0, 0], # rB day 4 period 3
-        [0, 0, 0, 0], # rC day 0 period 0
-        [0, 0, 0, 0], # rC day 0 period 1
-        [0, 0, 1, 0], # rC day 0 period 2
-        [0, 0, 0, 0], # rC day 0 period 3
-        [0, 0, 0, 0], # rC day 1 period 0
-        [0, 0, 0, 0], # rC day 1 period 1
-        [0, 0, 1, 0], # rC day 1 period 2
-        [0, 0, 0, 1], # rC day 1 period 3
-        [0, 0, 0, 0], # rC day 2 period 0
-        [0, 0, 0, 0], # rC day 2 period 1
-        [0, 0, 1, 0], # rC day 2 period 2
-        [0, 0, 0, 1], # rC day 2 period 3
-        [0, 0, 0, 0], # rC day 3 period 0
-        [0, 0, 0, 0], # rC day 3 period 1
-        [0, 0, 0, 0], # rC day 3 period 2
-        [0, 0, 0, 0], # rC day 3 period 3
-        [0, 0, 0, 0], # rB day 4 period 0
-        [0, 0, 0, 0], # rB day 4 period 1
-        [0, 0, 0, 0], # rB day 4 period 2
-        [0, 0, 0, 0], # rB day 4 period 3
-        
+        [1, 0, 0, 0],  # rA day 0 period 0
+        [0, 0, 0, 0],  # rA day 0 period 1
+        [0, 0, 0, 0],  # rA day 0 period 2
+        [0, 0, 0, 1],  # rA day 0 period 3
+        [1, 0, 0, 0],  # rA day 1 period 0
+        [0, 0, 0, 0],  # rA day 1 period 1
+        [0, 0, 0, 0],  # rA day 1 period 2
+        [0, 0, 0, 0],  # rA day 1 period 3
+        [1, 0, 0, 0],  # rA day 2 period 0
+        [0, 0, 0, 0],  # rA day 2 period 1
+        [0, 0, 0, 0],  # rA day 2 period 2
+        [0, 0, 0, 0],  # rA day 2 period 3
+        [0, 0, 0, 0],  # rA day 3 period 0
+        [0, 0, 0, 0],  # rA day 3 period 1
+        [0, 0, 0, 0],  # rA day 3 period 2
+        [0, 0, 0, 0],  # rA day 3 period 3
+        [0, 0, 0, 0],  # rA day 4 period 0
+        [0, 0, 0, 0],  # rA day 4 period 1
+        [0, 0, 0, 0],  # rA day 4 period 2
+        [0, 0, 0, 0],  # rA day 4 period 3
+        [0, 0, 0, 0],  # rB day 0 period 0
+        [0, 1, 0, 0],  # rB day 0 period 1
+        [0, 0, 0, 0],  # rB day 0 period 2
+        [0, 0, 0, 0],  # rB day 0 period 3
+        [0, 0, 0, 0],  # rB day 1 period 0
+        [0, 1, 0, 0],  # rB day 1 period 1
+        [0, 0, 0, 0],  # rB day 1 period 2
+        [0, 0, 0, 0],  # rB day 1 period 3
+        [0, 0, 0, 0],  # rB day 2 period 0
+        [0, 1, 0, 0],  # rB day 2 period 1
+        [0, 0, 0, 0],  # rB day 2 period 2
+        [0, 0, 0, 0],  # rB day 2 period 3
+        [0, 0, 0, 0],  # rB day 3 period 0
+        [0, 1, 0, 0],  # rB day 3 period 1
+        [0, 0, 0, 0],  # rB day 3 period 2
+        [0, 0, 0, 0],  # rB day 3 period 3
+        [0, 0, 0, 0],  # rB day 4 period 0
+        [0, 0, 0, 0],  # rB day 4 period 1
+        [0, 0, 0, 0],  # rB day 4 period 2
+        [0, 0, 0, 0],  # rB day 4 period 3
+        [0, 0, 0, 0],  # rC day 0 period 0
+        [0, 0, 0, 0],  # rC day 0 period 1
+        [0, 0, 1, 0],  # rC day 0 period 2
+        [0, 0, 0, 0],  # rC day 0 period 3
+        [0, 0, 0, 0],  # rC day 1 period 0
+        [0, 0, 0, 0],  # rC day 1 period 1
+        [0, 0, 1, 0],  # rC day 1 period 2
+        [0, 0, 0, 1],  # rC day 1 period 3
+        [0, 0, 0, 0],  # rC day 2 period 0
+        [0, 0, 0, 0],  # rC day 2 period 1
+        [0, 0, 1, 0],  # rC day 2 period 2
+        [0, 0, 0, 1],  # rC day 2 period 3
+        [0, 0, 0, 0],  # rC day 3 period 0
+        [0, 0, 0, 0],  # rC day 3 period 1
+        [0, 0, 0, 0],  # rC day 3 period 2
+        [0, 0, 0, 0],  # rC day 3 period 3
+        [0, 0, 0, 0],  # rB day 4 period 0
+        [0, 0, 0, 0],  # rB day 4 period 1
+        [0, 0, 0, 0],  # rB day 4 period 2
+        [0, 0, 0, 0],  # rB day 4 period 3
     ]
     pprint(expected)
 
@@ -314,5 +308,6 @@ class TestEvaluation:
         }
         assert self.problem.evaluate_dict(solution, weights) == (
             self.soft_weights[1] * 2,
-            {"S2"},
+            # TODO check that the count of violations is correct
+            ["S2", "S2"],
         )
