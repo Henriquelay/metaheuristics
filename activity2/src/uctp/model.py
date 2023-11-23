@@ -1,9 +1,12 @@
 """This module contains the model for the University Course Timetabling Problem."""
 
 from __future__ import annotations
+from collections import defaultdict
+from email.policy import default
 from enum import Enum
+from pprint import pprint
 
-from typing import Self, Sequence
+from typing import Optional, Self, Sequence
 from weakref import ref
 
 from networkx import Graph
@@ -11,12 +14,6 @@ from networkx import Graph
 from uctp.instance_parser import parse_int, parse_word, skip_white_lines, keyword
 
 TIME_SLOT_SEPARATOR = "-"
-
-
-def format_room_period_name(room: str, day: int, period: int) -> str:
-    """Returns a string representing a room-day-period."""
-
-    return f"{room}{TIME_SLOT_SEPARATOR}{day}{TIME_SLOT_SEPARATOR}{period}"
 
 
 class Room:
@@ -122,14 +119,12 @@ class Curriculum:
 
     def __init__(self, name: str, courses: list[Course]) -> None:
         self.name = name
-        self.courses: dict[str, Course] = {}
-        for course in courses:
-            self.courses[course.name] = course
+        self.courses = courses
 
     def __str__(self) -> str:
         return f"""Curriculum(\
                 Name = {self.name},\
-                Courses = {[(k, v.__str__()) for k, v in self.courses.items()]}\
+                Courses = {self.courses}\
             )"""
 
     @classmethod
@@ -146,6 +141,11 @@ class Curriculum:
         return cls(name, curriculum_courses), line
 
 
+# A Solution for UCTP.
+# Adjacency list of room_day_period -> course
+type Solution = list[list[int]]
+
+
 class UCTP:
     """A University Course Timetabling Problem instance."""
 
@@ -160,30 +160,33 @@ class UCTP:
         name: str,
         days: int,
         periods_per_day: int,
-        rooms: dict[str, Room],
-        curricula: dict[str, Curriculum],
+        rooms: list[Room],
+        curricula: list[Curriculum],
         constraints: list[Constraint],
     ) -> None:
         self.name = name
         self.days = days
         self.periods_per_day = periods_per_day
         self.rooms = rooms
+        self.room_names = [room.name for room in rooms]
         self.curricula = curricula
         self.constraints = constraints
-        self.courses = {
-            course.name: course
-            for curriculum in curricula.values()
-            for course in curriculum.courses.values()
-        }
-        self.teachers = {course.teacher for course in self.courses.values()}
+        self.courses = list(
+            # Dedups in-place
+            dict.fromkeys(
+                course for curriculum in curricula for course in curriculum.courses
+            )
+        )
+        # self.course_names = [course.name for course in self.courses]
+        self.teachers = list({course.teacher for course in self.courses})
 
     def __str__(self) -> str:
         return f"""UCTP(\
 Name = {self.name}\
 Days = {self.days}\
 PeriodsPerDay = {self.periods_per_day}\
-Rooms = {[(k, v.__str__()) for k, v in self.rooms.items()]}\
-Curricula = {[(k, v.__str__()) for k, v in self.curricula.items()]}\
+Rooms = {self.rooms}\
+Curricula = {self.curricula}\
 Constraints = {[v.__str__() for v in self.constraints]}\
 )"""
 
@@ -226,25 +229,25 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             body = body[1:]
 
         body = skip_white_lines(body)
-        rooms = {}
+        rooms: list[Room] = []
         keyword(body[0], "ROOMS:")
         body = body[1:]
         for _ in range(rooms_amount):
             room, line = Room.parse(body[0])
             if line:
                 raise ValueError(f"Expected end of line. Found {line}.")
-            rooms[room.name] = room
+            rooms.append(room)
             body = body[1:]
 
         body = skip_white_lines(body)
-        curricula = {}
+        curricula: list[Curriculum] = []
         keyword(body[0], "CURRICULA:")
         body = body[1:]
         for _ in range(curricula_amount):
             curriculum, line = Curriculum.parse(body[0], courses)
             if line:
                 raise ValueError(f"Expected end of line. Found {line}.")
-            curricula[curriculum.name] = curriculum
+            curricula.append(curriculum)
             body = body[1:]
 
         body = skip_white_lines(body)
@@ -267,50 +270,52 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             constraints,
         )
 
-    def to_graph(self) -> Graph:
+    def to_graph(self) -> Solution:
         """Returns a graph base representation of the problem, with no solutions drawn."""
 
-        graph = Graph()
-        for course in self.courses:
-            # add course to graph
-            graph.add_node(
-                course,
-                color=self.Colors.COURSE,
-            )
-
-        for node_name in [
-            format_room_period_name(room.name, day, period)
-            for room in self.rooms.values()
-            for day in range(self.days)
-            for period in range(self.periods_per_day)
-        ]:
-            graph.add_node(
-                node_name,
-                color=self.Colors.ROOM,
-            )
-
-        return graph
+        return [
+            [0 for _ in range(len(self.courses))]
+            for _ in range(len(self.rooms) * self.days * self.periods_per_day)
+        ]
 
     def solution_to_graph(
         self, solution: dict[str, list[tuple[str, int, int]]]
-    ) -> Graph:
+    ) -> Solution:
         """Returns a graph base representation of the problem, with the solution drawn."""
 
-        base_graph = self.to_graph()
+        base_solution = self.to_graph()
 
-        for course, room_time_slots in solution.items():
-            for room, day, period in room_time_slots:
-                base_graph.add_edge(
-                    course,
-                    format_room_period_name(room, day, period),
+        for course_name, periods in solution.items():
+            for room_name, day, period in periods:
+                room_index = self.room_names.index(room_name)
+                # Day and Period both starts at zero
+                room_offset = room_index * self.days * self.periods_per_day
+                day_offset = day * self.periods_per_day
+
+                period_offset = room_offset + day_offset + period
+
+                course_index = next(
+                    i
+                    for i, course in enumerate(self.courses)
+                    if course.name == course_name
                 )
 
-        return base_graph
+                base_solution[period_offset][course_index] += 1
 
-    def best_neighbor(self, solution: Graph, neighborhood_size: int) -> Graph:
-        """Generates graphs neighboring the passed solution, and returns the best one."""
-        # TODO 
+        return base_solution
+
+    @classmethod
+    def lecture_move(cls, solution: Graph) -> Graph:
+        """Moves two random timeslots, regardless if there is a course there or not. It there is a course, it is moved to the other timeslot."""
+        # TODO
         return solution
+
+    def neighbors(
+        self, solution: Graph, neighborhood_size: int
+    ) -> set[tuple[Graph, float]]:
+        """Generates graphs neighboring the passed solution. Also passes in the score of each solution."""
+        # TODO
+        return set()
 
     def evaluate_dict(
         self,
@@ -325,73 +330,63 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 
     def evaluate(
         self,
-        solution: Graph,
+        solution: Solution,
         weights: tuple[
             tuple[float, float, float, float], tuple[float, float, float, float]
         ],
     ) -> tuple[float, set[str]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
-        # TODO convert to matrix representation evaluation
-
-        nodes_data = solution.nodes.data()
-        # nodes: dict[str, dict[str, Any]] = {node: data for node, data in nodes_data}
 
         # List of Rooms and timeslots assigned to each course
-        course_timeslots: dict[str, list[tuple[Room, int, int]]] = {}
+        course_timeslots: dict[int, list[tuple[Room, int, int]]] = defaultdict(list)
         # List of timeslots assigned to each teacher
-        teacher_timeslots: dict[str, list[tuple[int, int]]] = {}
+        teacher_timeslots: dict[str, list[tuple[int, int]]] = defaultdict(list)
         # List of courses assigned to each timeslot
-        timeslot_courses: dict[tuple[int, int], list[tuple[Room, Course]]] = {}
+        timeslot_courses: dict[
+            tuple[int, int], list[tuple[Room, Course]]
+        ] = defaultdict(list)
         # List of timeslots assigned to each curriculum
-        curriculum_timeslots: dict[str, list[tuple[int, int]]] = {}
+        curriculum_timeslots: dict[str, list[tuple[int, int]]] = defaultdict(list)
+
+        for course_index, course in enumerate(self.courses):
+            assigned_timeslots = [
+                index
+                for index in range(len(solution))
+                if solution[index][course_index] > 0
+            ]
+
+            timeslots = [
+                # (room, day, period)
+                (
+                    slot // (self.days * self.periods_per_day),
+                    (slot % (self.days * self.periods_per_day)) // self.periods_per_day,
+                    (slot % (self.days * self.periods_per_day)) % self.periods_per_day,
+                )
+                for slot in assigned_timeslots
+            ]
+
+            for room, day, period in timeslots:
+                room = self.rooms[room]
+
+                course_timeslots[course_index].append((room, day, period))
+                teacher_timeslots[course.teacher].append((day, period))
+                timeslot_courses[(day, period)].append((room, course))
+
+                curricula = [
+                    curriculum
+                    for curriculum in self.curricula
+                    if course in curriculum.courses
+                ]
+
+                for curriculum in curricula:
+                    curriculum_timeslots[curriculum.name].append((day, period))
 
         properties: set[str] = set()
 
         score = 0.0
 
-        for node_name, node_data in nodes_data:
-            if node_data["color"] == self.Colors.COURSE:
-                course = self.courses[node_name]
-                course_curricula = [
-                    curriculum
-                    for curriculum in self.curricula.values()
-                    if course.name in curriculum.courses.keys()
-                ]
-                timeslots: list[str] = list(solution.neighbors(course.name))
-                for timeslot in timeslots:
-                    (room, day, period) = timeslot.split(TIME_SLOT_SEPARATOR)
-                    day = int(day)
-                    period = int(period)
-                    room = self.rooms[room]
-
-                    if course.name not in course_timeslots:
-                        course_timeslots[course.name] = [(room, day, period)]
-                    else:
-                        course_timeslots[course.name].append((room, day, period))
-
-                    if course.teacher not in teacher_timeslots:
-                        teacher_timeslots[course.teacher] = [(day, period)]
-                    else:
-                        teacher_timeslots[course.teacher].append((day, period))
-
-                    if (day, period) not in timeslot_courses:
-                        timeslot_courses[(day, period)] = [(room, course)]
-                    else:
-                        timeslot_courses[(day, period)].append((room, course))
-
-                    for curriculum in course_curricula:
-                        if curriculum.name not in curriculum_timeslots:
-                            curriculum_timeslots[curriculum.name] = [(day, period)]
-                        else:
-                            curriculum_timeslots[curriculum.name].append((day, period))
-
-            elif node_data["color"] == self.Colors.ROOM:
-                pass
-            else:
-                raise ValueError(f"Invalid node color: {node_data['color']}")
-
-        for course, periods in course_timeslots.items():
-            course = self.courses[course]
+        for course_index, periods in course_timeslots.items():
+            course = self.courses[course_index]
 
             # H1 - Lectures: All lectures of a course must be alocated, and in  different periods. Each lecture not allocated is a violation. Each lecture more than one allocated on the same period is also a violation.
             # if some lecture is not allocated, then there is a violation
@@ -460,7 +455,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 last_period = period
 
         # H2 - Room occupancy: Two lectures can't be allocated in the same room-period. Each extra lecture allocated in the same room-period is a violation.
-        for timeslot, room_courses in timeslot_courses.items():
+        for room_courses in timeslot_courses.values():
             # If Room repeats in the list, then there is a violation
             rooms = [room for room, _ in room_courses]
             score += weights[0][1] * (len(rooms) - len(set(rooms)))
@@ -474,39 +469,3 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                     properties.add("S1")
 
         return (score, properties)
-
-
-# Name: Toy
-# Courses: 4
-# Rooms: 3
-# Days: 5
-# Periods_per_day: 4
-# Curricula: 2
-# Constraints: 8
-
-# COURSES:
-# SceCosC Ocra 3 3 30
-# ArcTec Indaco 4 3 42
-# TecCos Rosa 3 4 40
-# Geotec Scarlatti 3 4 18
-
-# ROOMS:
-# rA 32
-# rB 50
-# rC 40
-
-# CURRICULA:
-# Cur1 3 SceCosC ArcTec TecCos
-# Cur2 2 TecCos Geotec
-
-# UNAVAILABILITY_CONSTRAINTS:
-# TecCos 2 0
-# TecCos 2 1
-# TecCos 3 2
-# TecCos 3 3
-# ArcTec 4 0
-# ArcTec 4 1
-# ArcTec 4 2
-# ArcTec 4 3
-
-# END.

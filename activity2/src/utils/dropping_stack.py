@@ -11,7 +11,7 @@ class DroppingStack[T]:
 
     def __init__(self, max_size: int):
         self.max_size = max_size
-        self.stack = []
+        self.stack: list[T] = []
 
     def push(self, item: T):
         """Pushes an element to the stack"""

@@ -4,6 +4,8 @@ from math import inf
 from pprint import pprint
 from typing import Any
 
+import pytest
+
 from uctp.model import TIME_SLOT_SEPARATOR, UCTP, Constraint
 
 TOY_INSTANCE = """Name: Toy
@@ -73,40 +75,27 @@ def test_UCTP_parsing():
     assert len(problem.curricula) == 2
     assert len(problem.constraints) == 8
 
-    rooms_names = {room.name for room in problem.rooms.values()}
-    assert rooms_names == {"rA", "rB", "rC"}
+    assert problem.room_names == ["rA", "rB", "rC"]
 
-    curricula_names = {curriculum.name for curriculum in problem.curricula.values()}
-    assert curricula_names == {"Cur1", "Cur2"}
+    curricula_names = [curriculum.name for curriculum in problem.curricula]
+    assert curricula_names == ["Cur1", "Cur2"]
 
-    for curriculum in problem.curricula.values():
+    for curriculum in problem.curricula:
         if curriculum.name == "Cur1":
-            assert {course.name for course in curriculum.courses.values()} == {
+            assert [course.name for course in curriculum.courses] == [
                 "SceCosC",
                 "ArcTec",
                 "TecCos",
-            }
+            ]
         elif curriculum.name == "Cur2":
-            assert {course.name for course in curriculum.courses.values()} == {
+            assert [course.name for course in curriculum.courses] == [
                 "TecCos",
                 "GeoTec",
-            }
+            ]
         else:
             assert False
 
-    assert problem.rooms["rA"].capacity == 32
-    assert problem.rooms["rB"].capacity == 50
-    assert problem.rooms["rC"].capacity == 40
-
-    assert {course.name for course in problem.curricula["Cur1"].courses.values()} == {
-        "SceCosC",
-        "ArcTec",
-        "TecCos",
-    }
-    assert {course.name for course in problem.curricula["Cur2"].courses.values()} == {
-        "TecCos",
-        "GeoTec",
-    }
+    assert [room.capacity for room in problem.rooms] == [32, 50, 40]
 
     def assert_constraint(
         constraint: Constraint, course_name: str, day: int, period: int
@@ -133,94 +122,96 @@ def test_UCTP_graph():
     problem = UCTP.parse(TOY_INSTANCE.splitlines())
     graph = problem.to_graph()
 
-    nodes_data = graph.nodes.data()
-    # Convert into a dict[node_name, data]
-    nodes: dict[str, dict[str, Any]] = {node[0]: node[1] for node in nodes_data}
-    pprint(nodes)
+    assert graph == [
+        [0 for _ in range(len(problem.courses))]
+        for _ in range(len(problem.rooms) * problem.days * problem.periods_per_day)
+    ]
 
-    # "course" colored nodes must exist
-    assert len(
-        {node for node in nodes if nodes[node]["color"] == problem.Colors.COURSE}
-    ) == len(problem.courses)
 
-    # "room-day-period" colored nodes must exist
-    assert (
-        len({node for node in nodes if nodes[node]["color"] == problem.Colors.ROOM})
-        == len(problem.rooms) * problem.days * problem.periods_per_day
-    )
+def test_UCTP_solution_drawing():
+    """Asserts that the solution drawing is correct"""
 
-    for node in nodes:
-        # All nodes must have a color
-        assert "color" in nodes[node]
+    problem = UCTP.parse(TOY_INSTANCE.splitlines())
 
-        # Same color nodes must not be adjacent.
-        for neighbor in graph.neighbors(node):
-            print(neighbor)
-            assert nodes[node]["color"] != nodes[neighbor]["color"]
+    solution = {
+        "SceCosC": [("rA", 0, 0), ("rA", 1, 0), ("rA", 2, 0)],
+        "ArcTec": [("rB", 0, 1), ("rB", 1, 1), ("rB", 2, 1), ("rB", 3, 1)],
+        "TecCos": [("rC", 0, 2), ("rC", 1, 2), ("rC", 2, 2)],
+        "GeoTec": [("rA", 0, 3), ("rC", 1, 3), ("rC", 2, 3)],
+    }
 
-        if nodes[node]["color"] == problem.Colors.COURSE:
-            # Course nodes must be intially connected to no room nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "room-day-period"
-                    }
-                )
-                == 0
-            )
+    drawing = problem.solution_to_graph(solution)
 
-            # Course n odes must be connected to one and only one teacher node
-            expected_course = {problem.courses[node]}
-            assert len(expected_course) == 1
-            expected_course = expected_course.pop()
+    pprint(drawing)
 
-        elif nodes[node]["color"] == problem.Colors.ROOM:
-            # Room should exist in the problem
-            assert node.split(TIME_SLOT_SEPARATOR)[0] in problem.rooms.keys()
+    
+    expected = [
+        # SceCos; ArcTec; TecCos; GeoTec
+        [1, 0, 0, 0], # rA day 0 period 0
+        [0, 0, 0, 0], # rA day 0 period 1
+        [0, 0, 0, 0], # rA day 0 period 2
+        [0, 0, 0, 1], # rA day 0 period 3
+        [1, 0, 0, 0], # rA day 1 period 0
+        [0, 0, 0, 0], # rA day 1 period 1
+        [0, 0, 0, 0], # rA day 1 period 2
+        [0, 0, 0, 0], # rA day 1 period 3
+        [1, 0, 0, 0], # rA day 2 period 0
+        [0, 0, 0, 0], # rA day 2 period 1
+        [0, 0, 0, 0], # rA day 2 period 2
+        [0, 0, 0, 0], # rA day 2 period 3
+        [0, 0, 0, 0], # rA day 3 period 0
+        [0, 0, 0, 0], # rA day 3 period 1
+        [0, 0, 0, 0], # rA day 3 period 2
+        [0, 0, 0, 0], # rA day 3 period 3
+        [0, 0, 0, 0], # rA day 4 period 0
+        [0, 0, 0, 0], # rA day 4 period 1
+        [0, 0, 0, 0], # rA day 4 period 2
+        [0, 0, 0, 0], # rA day 4 period 3
+        [0, 0, 0, 0], # rB day 0 period 0
+        [0, 1, 0, 0], # rB day 0 period 1
+        [0, 0, 0, 0], # rB day 0 period 2
+        [0, 0, 0, 0], # rB day 0 period 3
+        [0, 0, 0, 0], # rB day 1 period 0
+        [0, 1, 0, 0], # rB day 1 period 1
+        [0, 0, 0, 0], # rB day 1 period 2
+        [0, 0, 0, 0], # rB day 1 period 3
+        [0, 0, 0, 0], # rB day 2 period 0
+        [0, 1, 0, 0], # rB day 2 period 1
+        [0, 0, 0, 0], # rB day 2 period 2
+        [0, 0, 0, 0], # rB day 2 period 3
+        [0, 0, 0, 0], # rB day 3 period 0
+        [0, 1, 0, 0], # rB day 3 period 1
+        [0, 0, 0, 0], # rB day 3 period 2
+        [0, 0, 0, 0], # rB day 3 period 3
+        [0, 0, 0, 0], # rB day 4 period 0
+        [0, 0, 0, 0], # rB day 4 period 1
+        [0, 0, 0, 0], # rB day 4 period 2
+        [0, 0, 0, 0], # rB day 4 period 3
+        [0, 0, 0, 0], # rC day 0 period 0
+        [0, 0, 0, 0], # rC day 0 period 1
+        [0, 0, 1, 0], # rC day 0 period 2
+        [0, 0, 0, 0], # rC day 0 period 3
+        [0, 0, 0, 0], # rC day 1 period 0
+        [0, 0, 0, 0], # rC day 1 period 1
+        [0, 0, 1, 0], # rC day 1 period 2
+        [0, 0, 0, 1], # rC day 1 period 3
+        [0, 0, 0, 0], # rC day 2 period 0
+        [0, 0, 0, 0], # rC day 2 period 1
+        [0, 0, 1, 0], # rC day 2 period 2
+        [0, 0, 0, 1], # rC day 2 period 3
+        [0, 0, 0, 0], # rC day 3 period 0
+        [0, 0, 0, 0], # rC day 3 period 1
+        [0, 0, 0, 0], # rC day 3 period 2
+        [0, 0, 0, 0], # rC day 3 period 3
+        [0, 0, 0, 0], # rB day 4 period 0
+        [0, 0, 0, 0], # rB day 4 period 1
+        [0, 0, 0, 0], # rB day 4 period 2
+        [0, 0, 0, 0], # rB day 4 period 3
+        
+    ]
+    pprint(expected)
 
-            # Room nodes must be connected to no course nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "course"
-                    }
-                )
-                == 0
-            )
-
-            # Room nodes must be connected to no curriculum nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "curriculum"
-                    }
-                )
-                == 0
-            )
-
-            # Room nodes must be connected to no teacher nodes.
-            assert (
-                len(
-                    {
-                        neighbor
-                        for neighbor in graph.neighbors(node)
-                        if nodes[neighbor]["color"] == "teacher"
-                    }
-                )
-                == 0
-            )
-
-        else:
-            # Other nodes must not exist
-            print(node)
-            print(nodes[node])
-            assert False
+    assert drawing == expected
 
 
 class TestEvaluation:

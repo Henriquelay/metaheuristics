@@ -32,6 +32,7 @@ def test_gls_solution():
             weights=weights,
         )
 
+        pprint(solution.edges)
         pprint(instance.evaluate(solution, weights)[0])
         print()
     assert False

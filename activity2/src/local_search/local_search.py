@@ -3,78 +3,13 @@
 from __future__ import annotations
 from pprint import pprint
 
-from typing import Callable
+from typing import Callable, Sequence
 from enum import Enum
 
 from networkx import Graph
 from uctp.model import UCTP
 
 from utils.dropping_stack import DroppingStack
-
-
-# class Problem:
-#     """A generic minimization/optimization problem."""
-
-#     class ProblemKind(Enum):
-#         """The kind of the problem."""
-
-#         MAXIMIZATION = 1
-#         MINIMIZATION = 2
-
-#     def __init__(
-#         self,
-#         objective_function: Callable[[int | float], int | float],
-#         kind: ProblemKind,
-#         search_space: tuple[int | float, int | float],
-#         graph: Graph,
-#         properties_function: Callable[[int | float], dict[str, int]] = lambda x: {},
-#     ):
-#         self.objective_function = objective_function
-#         self.properties_function = properties_function
-#         self.kind = kind
-#         self.search_space = search_space
-#         self.graph = graph
-
-#     def value_at(self, solution: int | float) -> int | float:
-#         """Returns the value of the solution in the point int | float"""
-
-#         return self.objective_function(solution)
-
-#     def properties(self, solution: int | float) -> dict[str, int]:
-#         """Returns the present properties of the solution in the point int | float"""
-
-#         return self.properties_function(solution)
-
-#     def neighbors(self, solution: int | float) -> list[int | float]:
-#         """Returns the neighbors of the solution"""
-#         # TODO bound within search space
-
-#         return list(self.graph.neighbors(solution))
-
-#     def best_neighbor(self, solution: int | float) -> int | float:
-#         """Returns the best neighbor of the solution"""
-
-#         neighbors = self.neighbors(solution)
-#         best_neighbor = neighbors[0]
-#         best_neighbor_value = self.value_at(best_neighbor)
-
-#         for neighbor in neighbors[1:]:
-#             neighbor_value = self.value_at(neighbor)
-#             if self.better(neighbor_value, best_neighbor_value):
-#                 best_neighbor = neighbor
-#                 best_neighbor_value = neighbor_value
-
-#         return best_neighbor
-
-#     def better(self, value_a: int | float, value_b: int | float) -> bool:
-#         """Returns whether value_a is better than value_b"""
-
-#         if self.kind == Problem.ProblemKind.MAXIMIZATION:
-#             return value_a > value_b
-#         elif self.kind == Problem.ProblemKind.MINIMIZATION:
-#             return value_a < value_b
-#         else:
-#             raise ValueError("Invalid problem kind")
 
 
 class LocalSearch:
@@ -88,11 +23,9 @@ class LocalSearch:
 
     def __init__(
         self,
-        # problem: Problem,
         neighborhood_size: int,
         n_opt=NOpt.TWO_OPT,
     ):
-        # self.problem = problem
         self.neighborhood_size = neighborhood_size
         self.n_opt = n_opt
 
@@ -155,10 +88,11 @@ class LocalSearch:
             # Increment the iteration counter.
             iteration += 1
             # Get the best neighbor of the current solution.
-            best_neighbor = problem.best_neighbor(
-                current_solution, self.neighborhood_size
+
+            neighbors = problem.neighbors(current_solution, 10)
+            best_neighbor, best_neighbor_value = min(
+                neighbors, key=lambda neighbor: neighbor[1]
             )
-            best_neighbor_value = problem.evaluate(best_neighbor, weights)[0]
 
             last_solutions.push(best_neighbor_value)
 
