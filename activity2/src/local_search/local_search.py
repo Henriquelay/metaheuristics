@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 from collections import defaultdict
+from time import time
+from tracemalloc import start
 from typing import Callable
 from enum import Enum
 
@@ -21,17 +23,21 @@ class LocalSearch:
 
     def __init__(
         self,
-        neighborhood_size: int,
         n_opt=NOpt.TWO_OPT,
+        neighborhood_size: int = 10,
+        # Time benchmarked for my machine at home
+        time_limit_secs: int = 72,
     ):
         self.neighborhood_size = neighborhood_size
         self.n_opt = n_opt
+        self.time_limit_secs = time_limit_secs
 
     def stopping_criterion(
         self,
         iteration: int,
         max_iterations: int,
         last_solutions: DroppingStack[int | float],
+        start_time: float,
     ) -> bool:
         """Returns whether the local search should stop or not. True means stop, False means continue."""
 
@@ -50,9 +56,12 @@ class LocalSearch:
         if len(last) >= 5:
             delta = abs(last[-1] - last[-5])
             delta_relative = delta / abs(last[-5])
-            print(delta_relative)
             if delta_relative < 0.01:
                 return True
+
+        # If the time limit has been reached
+        if time() - start_time >= self.time_limit_secs:
+            return True
 
         # If the maximum number of iterations has been reached.
         return iteration >= max_iterations
@@ -62,15 +71,15 @@ class LocalSearch:
         initial_solution: Solution,
         max_iterations: int,
         problem: UCTP,
-        weights: tuple[
-            tuple[float, float, float, float], tuple[float, float, float, float]
-        ],
-    ):
-        """Runs the local search algorithm for the problem"""
+    ) -> tuple[Solution, float, int, float]:
+        """Runs the local search algorithm for the problem. Returns the best solution, the score of the solution, the number of iterations and time elapsed."""
+
+        # Start the timer
+        start_time = time()
 
         # Initialize the solution.
         current_solution = initial_solution
-        current_solution_value = problem.evaluate(current_solution, weights)[0]
+        current_solution_value = problem.evaluate(current_solution)[0]
 
         # Initialize the best solution.
         best_solution = current_solution
@@ -82,14 +91,19 @@ class LocalSearch:
         iteration = 0
 
         # While the stopping criterion is not met.
-        while not self.stopping_criterion(iteration, max_iterations, last_solutions):
+        while not self.stopping_criterion(
+            iteration, max_iterations, last_solutions, start_time
+        ):
             # Increment the iteration counter.
             iteration += 1
             # Get the best neighbor of the current solution.
 
-            neighbors = problem.neighbors(current_solution, 10)
-            best_neighbor, best_neighbor_value = min(
-                neighbors, key=lambda neighbor: neighbor[1]
+            neighbors = problem.neighbors(current_solution, self.neighborhood_size)
+            neighbors = [
+                (neighbor, problem.evaluate(neighbor)) for neighbor in neighbors
+            ]
+            best_neighbor, (best_neighbor_value, _) = min(
+                neighbors, key=lambda neighbor: neighbor[1][0]
             )
 
             last_solutions.push(best_neighbor_value)
@@ -106,8 +120,11 @@ class LocalSearch:
                     best_solution = current_solution
                     best_solution_value = current_solution_value
 
+        # Finish the timer
+        elapsed_time = time() - start_time
+
         # Return the best solution.
-        return best_solution
+        return (best_solution, best_solution_value, iteration, elapsed_time)
 
 
 class GuidedLocalSearch(LocalSearch):
@@ -115,15 +132,15 @@ class GuidedLocalSearch(LocalSearch):
 
     def __init__(
         self,
-        neighborhood_size: int,
         llambda=0.3,
         alpha=1 / 4,
+        neighborhood_size: int = 10,
     ):
         self.penalties: dict[str, int] = defaultdict(int)
         self.llambda = llambda
         self.alpha = alpha
 
-        super().__init__(neighborhood_size)
+        super().__init__(neighborhood_size=neighborhood_size)
 
     def augmentation_factor(
         self,
@@ -149,14 +166,11 @@ class GuidedLocalSearch(LocalSearch):
     def augmented_objective_function(
         self,
         solution: Solution,
-        weights: Weights,
-        original_objective_function: Callable[
-            [Solution, Weights], tuple[float, list[str]]
-        ],
+        original_objective_function: Callable[[Solution], tuple[float, list[str]]],
     ) -> tuple[float, list[str]]:
         """Augments the passed objetive function with the heuristic information"""
 
-        value, properties = original_objective_function(solution, weights)
+        value, properties = original_objective_function(solution)
 
         return (
             value + self.augmentation_factor(properties, self.llambda, self.alpha),
@@ -168,34 +182,42 @@ class GuidedLocalSearch(LocalSearch):
         initial_solution: Solution,
         max_iterations: int,
         problem: UCTP,
-        weights: Weights,
-    ):
-        """Runs the local search algorithm for the problem"""
+    ) -> tuple[Solution, float, int, int, float]:
+        """Runs the local search algorithm for the problem. Returns the best solution, the score of the solution, the number of iterations, the number of local search iterations and time elapsed."""
+
+        # Start the timer
+        start_time = time()
 
         original_objective_function = problem.evaluate
-        problem.evaluate = lambda solution, weights: self.augmented_objective_function(
-            solution, weights, original_objective_function
+        problem.evaluate = lambda solution: self.augmented_objective_function(
+            solution, original_objective_function
         )
 
         iteration = 0
+        local_search_iterations = 0
 
         current_solution = initial_solution
 
         best_solution = initial_solution
-        best_solution_value, _ = original_objective_function(best_solution, weights)
+        best_solution_value, _ = original_objective_function(best_solution)
 
         last_solutions = DroppingStack(max_size=5)
 
-        while not self.stopping_criterion(iteration, max_iterations, last_solutions):
+        while not self.stopping_criterion(
+            iteration, max_iterations, last_solutions, start_time
+        ):
             iteration += 1
 
-            # Running a tenth of regular local search iterations
-            current_solution = super().search(
-                current_solution, max_iterations // 10, problem, weights
-            )
-            current_solution_value, _ = original_objective_function(
-                current_solution, weights
-            )
+            (
+                current_solution,
+                _current_solution_mappked_value,
+                more_local_search_iterations,
+                _time_elapsed,
+                # Running a half local search iterations
+            ) = super().search(current_solution, max_iterations // 2, problem)
+            current_solution_value, _ = original_objective_function(current_solution)
+
+            local_search_iterations += more_local_search_iterations
 
             last_solutions.push(current_solution_value)
 
@@ -204,4 +226,13 @@ class GuidedLocalSearch(LocalSearch):
                 best_solution = current_solution
                 best_solution_value = current_solution_value
 
-        return best_solution
+        # Finish the timer
+        elapsed_time = time() - start_time
+
+        return (
+            best_solution,
+            best_solution_value,
+            iteration,
+            local_search_iterations,
+            elapsed_time,
+        )

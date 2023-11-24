@@ -3,7 +3,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from enum import Enum
-
+from random import randint
 from typing import Self, Sequence
 from weakref import ref
 
@@ -141,9 +141,7 @@ type Solution = list[list[int]]
 
 # Weights for the objective function
 # (H1, H2, H3, H4), (S1, S2, S3, S4)
-type Weights = tuple[
-    tuple[float, float, float, float], tuple[float, float, float, float]
-]
+type Weights = tuple[tuple[int, int, int, int], tuple[int, int, int, int]]
 
 
 class UCTP:
@@ -177,8 +175,9 @@ class UCTP:
                 course for curriculum in curricula for course in curriculum.courses
             )
         )
-        # self.course_names = [course.name for course in self.courses]
         self.teachers = list({course.teacher for course in self.courses})
+
+        self.weights: Weights = ((10, 50, 20, 10), (1, 5, 2, 1))
 
     def __str__(self) -> str:
         return f"""UCTP(\
@@ -289,6 +288,24 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             for _ in range(len(self.rooms) * self.days * self.periods_per_day)
         ]
 
+    def random_solution(self) -> Solution:
+        """Returns a random solution for the problem. Tries a reasonably random and as valid solution as it can"""
+
+        solution = self.to_graph()
+
+        total_lectures = sum(course.lectures for course in self.courses)
+
+        for _ in range(total_lectures):
+            i = 0
+            while i < 50:
+                period_index, course_index = self.random_indexes(solution)
+                if solution[period_index][course_index] < 1:
+                    solution[period_index][course_index] += 1
+                    break
+                i += 1
+
+        return solution
+
     def solution_to_graph(
         self, solution: dict[str, list[tuple[str, int, int]]]
     ) -> Solution:
@@ -316,31 +333,41 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         return base_solution
 
     @classmethod
+    def random_indexes(cls, solution: Solution) -> tuple[int, int]:
+        """Returns two random indexes for the solution variable."""
+        row = randint(0, len(solution) - 1)
+        column = randint(0, len(solution[row]) - 1)
+        return (row, column)
+
+    @classmethod
     def lecture_move(cls, solution: Solution) -> Solution:
-        """Moves two random timeslots, regardless if there is a course there or not. It there is a course, it is moved to the other timeslot."""
-        # TODO
+        """Modify the solution variable to swap value from two random cells."""
+
+        row1, column1 = cls.random_indexes(solution)
+        row2, column2 = cls.random_indexes(solution)
+
+        solution[row1][column1], solution[row2][column2] = (
+            solution[row2][column2],
+            solution[row1][column1],
+        )
+
         return solution
 
-    def neighbors(
-        self, solution: Solution, neighborhood_size: int
-    ) -> set[tuple[Solution, float]]:
-        """Generates graphs neighboring the passed solution. Also passes in the score of each solution."""
-        # TODO
-        return set()
+    def neighbors(self, solution: Solution, neighborhood_size: int) -> list[Solution]:
+        """Generates graphs neighboring the passed solution."""
+        return [self.lecture_move(solution) for _ in range(neighborhood_size)]
 
     def evaluate_dict(
         self,
         solution_dict: dict[str, list[tuple[str, int, int]]],
-        weights: Weights,
     ) -> tuple[float, list[str]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
         graph = self.solution_to_graph(solution_dict)
-        return self.evaluate(graph, weights)
+        return self.evaluate(graph)
 
     def evaluate(
         self,
         solution: Solution,
-        weights: Weights,
     ) -> tuple[float, list[str]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
 
@@ -390,7 +417,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 
         properties: list[str] = []
 
-        score = 0.0
+        score = 0
 
         for course_index, periods in course_timeslots.items():
             course = self.courses[course_index]
@@ -398,12 +425,12 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             # H1 - Lectures: All lectures of a course must be alocated, and in  different periods. Each lecture not allocated is a violation. Each lecture more than one allocated on the same period is also a violation.
             # if some lecture is not allocated, then there is a violation
             if len(periods) < course.lectures:
-                score += weights[0][0] * (course.lectures - len(periods))
+                score += self.weights[0][0] * (course.lectures - len(periods))
                 properties.append("H1")
 
             # if lectures are allocated in the same period, then there is a violation
             periods_stripped_room = [(day, period) for _, day, period in periods]
-            score += weights[0][0] * (
+            score += self.weights[0][0] * (
                 len(periods_stripped_room) - len(set(periods_stripped_room))
             )
             if len(periods_stripped_room) != len(set(periods_stripped_room)):
@@ -414,30 +441,30 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 (constraint.day, constraint.period) for constraint in course.constraints
             }
             intersection = constraints.intersection(set(periods_stripped_room))
-            score += weights[0][3] * len(intersection)
+            score += self.weights[0][3] * len(intersection)
             if len(intersection) > 0:
                 properties.append("H4")
 
             # S2 - Minimum working days: The number of days where at least one lecture is scheduled must be greater or equal than the minimum working days of the course. Each day below the minimum is a violation.
             days = {day for day, _ in periods_stripped_room}
             if len(days) < course.min_working_days:
-                score += weights[1][1] * (course.min_working_days - len(days))
+                score += self.weights[1][1] * (course.min_working_days - len(days))
                 properties.append("S2")
 
             # S4 - Room stability: All lectures of a course must be allocated in the same room. Each lecture not allocated in the same room is a violation.
             rooms_of_lecture = len({room for room, _, _ in periods})
-            score += weights[1][3] * (rooms_of_lecture - 1)
+            score += self.weights[1][3] * (rooms_of_lecture - 1)
             if rooms_of_lecture > 1:
                 properties.append("S4")
 
         # H3 - Conflits: Lectures of courses in the same curriculum, or teached by the same teacher must be allocated in different periods. Each lecture allocated in the same period is a violation.
         for periods in teacher_timeslots.values():
-            score += weights[0][2] * (len(periods) - len(set(periods)))
+            score += self.weights[0][2] * (len(periods) - len(set(periods)))
             if len(periods) != len(set(periods)):
                 properties.append("H3")
 
         for periods in curriculum_timeslots.values():
-            score += weights[0][2] * (len(periods) - len(set(periods)))
+            score += self.weights[0][2] * (len(periods) - len(set(periods)))
             if len(periods) != len(set(periods)):
                 properties.append("H3")
 
@@ -455,7 +482,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                         in_gap = True
                     elif period > last_period + 1 and in_gap:
                         # Last period was a gap, and this is a gap too, so it's a violation
-                        score += weights[1][2]
+                        score += self.weights[1][2]
                         properties.append("S3")
                     else:
                         in_gap = False
@@ -465,14 +492,14 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         for room_courses in timeslot_courses.values():
             # If Room repeats in the list, then there is a violation
             rooms = [room for room, _ in room_courses]
-            score += weights[0][1] * (len(rooms) - len(set(rooms)))
+            score += self.weights[0][1] * (len(rooms) - len(set(rooms)))
             if len(rooms) != len(set(rooms)):
                 properties.append("H2")
 
             # S1 - Room capacity: The number of students in a room-period can't exceed the capacity of the room. Each student over the capacity is a violation.
             for room, course in room_courses:
                 if course.students > room.capacity:
-                    score += weights[1][0] * (course.students - room.capacity)
+                    score += self.weights[1][0] * (course.students - room.capacity)
                     properties.append("S1")
 
         return (score, properties)
