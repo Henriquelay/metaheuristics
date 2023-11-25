@@ -3,7 +3,7 @@
 from copy import copy
 from pprint import pprint
 
-from uctp.model import UCTP, Constraint
+from gls_uctp.uctp.model import UCTP, Constraint
 
 TOY_INSTANCE = """Name: Toy
 Courses: 4
@@ -95,22 +95,19 @@ def test_uctp_parsing():
     assert [room.capacity for room in problem.rooms] == [32, 50, 40]
 
     def assert_constraint(
-        constraint: Constraint, course_name: str, day: int, period: int
+        constraint: Constraint, day: int, period: int
     ):
-        course = constraint.course()
-        assert course is not None
-        assert course.name == course_name
         assert constraint.day == day
         assert constraint.period == period
 
-    assert_constraint(problem.constraints[0], "TecCos", 2, 0)
-    assert_constraint(problem.constraints[1], "TecCos", 2, 1)
-    assert_constraint(problem.constraints[2], "TecCos", 3, 2)
-    assert_constraint(problem.constraints[3], "TecCos", 3, 3)
-    assert_constraint(problem.constraints[4], "ArcTec", 4, 0)
-    assert_constraint(problem.constraints[5], "ArcTec", 4, 1)
-    assert_constraint(problem.constraints[6], "ArcTec", 4, 2)
-    assert_constraint(problem.constraints[7], "ArcTec", 4, 3)
+    assert_constraint(problem.constraints[0], 2, 0)
+    assert_constraint(problem.constraints[1], 2, 1)
+    assert_constraint(problem.constraints[2], 3, 2)
+    assert_constraint(problem.constraints[3], 3, 3)
+    assert_constraint(problem.constraints[4], 4, 0)
+    assert_constraint(problem.constraints[5], 4, 1)
+    assert_constraint(problem.constraints[6], 4, 2)
+    assert_constraint(problem.constraints[7], 4, 3)
 
 
 def test_uctp_graph():

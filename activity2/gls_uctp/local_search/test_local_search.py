@@ -1,6 +1,9 @@
+"""Tests for the local search heuristics for the UCTP problem."""
+
 from typing import Sequence
-from local_search.local_search import LocalSearch
-from uctp.model import UCTP
+
+from gls_uctp.local_search.local_search import LocalSearch, GuidedLocalSearch
+from gls_uctp.uctp.model import UCTP
 
 
 def cases(instances: Sequence):
@@ -37,6 +40,36 @@ def test_local_search(path: str):
         (_solution, solution_value, _niter, _time_elapsed) = LocalSearch(
             neighborhood_size=10
         ).search(initial_solution, 10, problem)
+
+        try:
+            assert solution_value is not None
+        finally:
+            file.close()
+
+
+@cases(paths)
+def test_guided_local_search(path: str):
+    """Test the guided local search algorithm for the UCTP problem."""
+
+    with open(path, "r", encoding="utf8") as file:
+        problem = UCTP.parse(file.readlines())
+
+        initial_solution = problem.random_solution()
+
+        initial_solution_value, _ = problem.evaluate(initial_solution)
+
+        print(f"Initial solution: {initial_solution_value}")
+
+        print(f"Solving for {path}")
+        (
+            _solution,
+            solution_value,
+            _niter,
+            _local_searches_iter,
+            _time_elapsed,
+        ) = GuidedLocalSearch(neighborhood_size=10).search(
+            initial_solution, 10, problem
+        )
 
         try:
             assert solution_value is not None

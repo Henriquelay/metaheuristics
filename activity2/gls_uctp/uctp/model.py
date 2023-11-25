@@ -5,9 +5,15 @@ from collections import defaultdict
 from enum import Enum
 from random import randint
 from typing import Self, Sequence
-from weakref import ref
 
-from uctp.instance_parser import parse_int, parse_word, skip_white_lines, keyword
+# from weakref import ref
+
+from gls_uctp.uctp.instance_parser import (
+    parse_int,
+    parse_word,
+    skip_white_lines,
+    keyword,
+)
 
 
 class Room:
@@ -62,6 +68,14 @@ Constraints = {[v.__str__() for v in self.constraints]}\
         """Adds a constraint to the course."""
         self.constraints.append(constraint)
 
+    def has_constraint(self, day: int, period: int) -> bool:
+        """Checks if the day and period are constrained for the course."""
+
+        return any(
+            constraint.day == day and constraint.period == period
+            for constraint in self.constraints
+        )
+
     @classmethod
     def parse(cls, line: str) -> tuple[Self, str]:
         """Parses a course from a line, removing it from the line."""
@@ -78,21 +92,12 @@ class Constraint:
     """A constraint for a course."""
 
     def __init__(self, course: Course, day: int, period: int) -> None:
-        self.course = ref(course)
         self.day = day
         self.period = period
         course.add_constraint(self)
 
     def __str__(self) -> str:
-        course = self.course()
-        if course:
-            return f"""Constraint(\
-Course = @|{course.name}|,\
-Day = {self.day},\
-Period = {self.period}\
-)"""
         return f"""Constraint(\
-Course = @|{course}|,\
 Day = {self.day},\
 Period = {self.period}\
 )"""
@@ -177,7 +182,7 @@ class UCTP:
         )
         self.teachers = list({course.teacher for course in self.courses})
 
-        self.weights: Weights = ((10, 50, 20, 10), (1, 5, 2, 1))
+        self.weights: Weights = ((10, 10, 10, 10), (1, 5, 2, 1))
 
     def __str__(self) -> str:
         return f"""UCTP(\
@@ -297,12 +302,19 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 
         for _ in range(total_lectures):
             i = 0
-            while i < 50:
-                period_index, course_index = self.random_indexes(solution)
-                if solution[period_index][course_index] < 1:
+            while True:
+                i += 1
+                period_index, course_index = self.random_valid_indexes(solution)
+                if i == 50:
                     solution[period_index][course_index] += 1
                     break
-                i += 1
+                day = period_index // self.periods_per_day
+                period = period_index % self.periods_per_day
+                if (solution[period_index][course_index] < 1) and (
+                    not self.courses[course_index].has_constraint(day, period)
+                ):
+                    solution[period_index][course_index] += 1
+                    break
 
         return solution
 
@@ -332,19 +344,27 @@ Constraints = {[v.__str__() for v in self.constraints]}\
 
         return base_solution
 
-    @classmethod
-    def random_indexes(cls, solution: Solution) -> tuple[int, int]:
+    def random_valid_indexes(self, solution: Solution) -> tuple[int, int]:
         """Returns two random indexes for the solution variable."""
-        row = randint(0, len(solution) - 1)
-        column = randint(0, len(solution[row]) - 1)
-        return (row, column)
 
-    @classmethod
-    def lecture_move(cls, solution: Solution) -> Solution:
+        while True:
+            row = randint(0, len(solution) - 1)
+            column = randint(0, len(solution[row]) - 1)
+
+            # If the cell is contrained and zero, then regenerate
+            if solution[row][column] == 0:
+                day = row // self.periods_per_day
+                period = row % self.periods_per_day
+                if self.courses[column].has_constraint(day, period):
+                    continue
+
+            return (row, column)
+
+    def lecture_move(self, solution: Solution) -> Solution:
         """Modify the solution variable to swap value from two random cells."""
 
-        row1, column1 = cls.random_indexes(solution)
-        row2, column2 = cls.random_indexes(solution)
+        row1, column1 = self.random_valid_indexes(solution)
+        row2, column2 = self.random_valid_indexes(solution)
 
         solution[row1][column1], solution[row2][column2] = (
             solution[row2][column2],
@@ -368,7 +388,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
     def evaluate(
         self,
         solution: Solution,
-    ) -> tuple[float, list[str]]:
+    ) -> tuple[int, list[str]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
 
         # List of Rooms and timeslots assigned to each course

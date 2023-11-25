@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "GLSUCTP"
-version = "0.1.0"
+name = "gls_uctp"
+version = "0.1.18"
 description = "Using Guided Local Search to solve the University Course Timetabling Problem"
 authors = ["Henriquelay <37563861+Henriquelay@users.noreply.github.com>"]
 readme = "README.md"
@@ -10,7 +10,6 @@ python = "^3.12"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.3"
-pytest-cov = "^4.1.0"
 black = "^23.11.0"
 pylint = "^3.0.2"
 

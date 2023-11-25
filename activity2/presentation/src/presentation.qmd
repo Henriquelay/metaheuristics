@@ -1,0 +1,164 @@
+---
+title: "Guided Local Search (GLS)"
+author: "Henrique Coutinho Layber"
+format:
+    html:
+        code-fold: true
+execute:
+  echo: true
+jupyter: python3
+---
+
+For a comparison of the local search algorithms, see @local-search-comparison.
+
+```{python}
+# | label: local-search-comparison
+# | fig-cap: "Results for running the heuristics on comp03.ctt"
+
+with open("../../instances/test/comp03.ctt", "r") as file:
+    instance = file.readlines()
+
+# Open an instance of the UCTP
+from gls_uctp.uctp.model import UCTP, Solution
+
+problem = UCTP.parse(instance)
+
+from gls_uctp.local_search.local_search import LocalSearch, GuidedLocalSearch
+
+
+def run_algo(
+    algo: LocalSearch,
+    initial_solution: Solution,
+    problem: UCTP = problem,
+    iterations: int = 1000,
+) -> tuple[float, float]:
+    """Runs the local search algorithm for the problem, starting from a random solution. Returns the best solution, the score of the solution, the number of iterations and time elapsed."""
+    search = algo.search(initial_solution, iterations, problem)
+
+    return (search[1], search[3])
+
+
+# Capture solutions over iter
+import concurrent.futures as futures
+import sys
+from collections import defaultdict
+
+times_to_run = 5
+time_limit_secs = 600
+neighborhood_size = 10
+iterations = 30000
+llambda = 0.3
+alpha = 1
+
+algo_solutions = defaultdict(list)
+algo_times = defaultdict(list)
+algos = {
+    "Local Search": LocalSearch(
+        neighborhood_size=neighborhood_size, time_limit_secs=time_limit_secs
+    ),
+    "Guided Local Search": GuidedLocalSearch(
+        neighborhood_size=neighborhood_size,
+        time_limit_secs=time_limit_secs,
+        llambda=llambda,
+        alpha=alpha,
+    ),
+}
+
+with futures.ProcessPoolExecutor() as executor:
+    future_result = {}
+    for i in range(times_to_run):
+        initial_solution = problem.random_solution()
+
+        for algo_name, algo in algos.items():
+            future_result[
+                executor.submit(run_algo, algo, initial_solution, iterations=iterations)
+            ] = algo_name
+
+    for future in futures.as_completed(future_result):
+        # print(f"Round {future_result[future]} finished")
+        try:
+            solutions, total_time = future.result()
+            algo_name = future_result[future]
+        except Exception as exc:
+            print(f"Future generated an exception: {exc}", file=sys.stderr)
+        else:
+            algo_solutions[algo_name].append(solutions)
+            mean_time = total_time / len(solutions)
+            algo_times[algo_name].append(mean_time)
+
+# means_solutions = {
+#     algo_name: [
+#         sum(x) / len(x)
+#         for algo_name, algo_iter_solutions in algo_solutions.items()
+#         for x in zip(*algo_iter_solutions)
+#     ]
+# }
+
+means_times_per_iter = {
+    algo_name: sum(algo_times) / len(algo_times)
+    for algo_name, algo_times in algo_times.items()
+}
+
+print(means_times_per_iter)
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+sns.set_theme(style="darkgrid")
+plt.xlabel("Iterations")
+plt.ylabel("Score")
+plt.title("Results for running the metaheuristics on comp03.ctt")
+
+
+colors = {
+    "Local Search": "blue",
+    "Guided Local Search": "green",
+}
+
+labels = {}
+
+for algo_name, solutions in algo_solutions.items():
+    # Plot only the best solution list (the one in which the last item is the smallest)
+    solution = min(solutions, key=lambda x: x[-1])
+
+    # Horizontal line for the best solution
+    # Also write it on y axis
+    # plt.text(
+    #     0,
+    #     solution[-1],
+    #     f"{solution[-1]}",
+    #     horizontalalignment="right",
+    #     verticalalignment="center",
+    #     color=colors[algo_name],
+    # )
+    # Replace with plt.annotate
+    # plt.annotate(value_text, xy=(constant_y, constant_y), xytext=(constant_y, constant_y + 5),
+    #  arrowprops=dict(facecolor='black', shrink=0.05))
+    constant_y = solution[-1]
+    plt.axhline(y=constant_y, color=colors[algo_name], linestyle=(0, (1, 10)))
+    plt.annotate(
+        f"{solution[-1]}",
+        xy=(0, constant_y),
+        xytext=(0, constant_y),
+        color=colors[algo_name],
+    )
+
+    # print(solution)
+
+    if algo_name not in labels:
+        labels[algo_name] = plt.plot(solution, label=algo_name, color=colors[algo_name])
+    else:
+        plt.plot(solution, color=colors[algo_name])
+
+plt.legend(
+    bbox_to_anchor=(1, 1),
+    fancybox=True,
+    shadow=True,
+    ncol=1,
+    title="Algorithms",
+)
+
+plt.show()
+
+
+```
