@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 from collections import defaultdict
+from pprint import pprint
 from time import time
-from typing import Callable
+from typing import Any, Callable
 from enum import Enum
 
 from gls_uctp.uctp.model import UCTP, Solution
@@ -34,28 +35,9 @@ class LocalSearch:
         iteration: int,
         max_iterations: int,
         start_time: float,
+        _last_solutions: list[int | float],
     ) -> bool:
         """Returns whether the local search should stop or not. True means stop, False means continue."""
-
-        # At least three solutions must have been evaluated.
-        # if len(last_solutions) < 3:
-        #     return False
-
-        # last: list[int | float] = last_solutions.stack
-
-        # # If the last 3 solutions only include the same 2 or less solutions.
-        # if len(last) >= 3:
-        #     if len(set(last[-3:])) <= 2:
-        #         print(f"Stopped because of same solutions found in the last 4 iterations: {set(last[-3:])}")
-        #         return True
-
-        # # If the delta between the last five solutions is less than 1%.
-        # if len(last) >= 5:
-        #     delta = abs(last[-1] - last[-5])
-        #     delta_relative = delta / abs(last[-5])
-        #     if delta_relative < 0.001:
-        #         print("Stopped because of small delta between the last 5 solutions.")
-        #         return True
 
         # If the time limit has been reached
         if (time() - start_time) >= self.time_limit_secs:
@@ -69,28 +51,35 @@ class LocalSearch:
 
         return False
 
+    @classmethod
+    def is_solution_valid(cls, constraints: dict[str, int]) -> bool:
+        """Returns whether the solution is valid or not."""
+
+        return not any(
+            constraint.startswith("H")
+            for constraint, offences in constraints.items()
+            if offences > 0
+        )
+
     # TODO make it yield instead of returning a list
     def search(
         self,
         initial_solution: Solution,
         max_iterations: int,
         problem: UCTP,
-    ) -> tuple[Solution, list[int], int, float]:
+        stopping_criterion: Any = None,
+    ) -> tuple[Solution, list[int], bool, int, float]:
         """Runs the local search algorithm for the problem. Returns the best solution, the score of the solution, the number of iterations and time elapsed."""
+
+        stopping_criterion = stopping_criterion or self.stopping_criterion
 
         # Start the timer
         start_time = time()
 
-        def is_solution_valid(constraints: list[str]) -> bool:
-            """Returns whether the solution is valid or not."""
-
-            # If any constraint starts with H, the solution is not valid
-            return not any(constraint.startswith("H") for constraint in constraints)
-
         # Initialize the solution.
         current_solution = initial_solution
         current_solution_value, constraints = problem.evaluate(current_solution)
-        current_solution_is_valid = is_solution_valid(constraints)
+        current_solution_is_valid = self.is_solution_valid(constraints)
 
         # Initialize the best solution.
         best_solution = current_solution
@@ -102,7 +91,9 @@ class LocalSearch:
         iteration = 0
 
         # While the stopping criterion is not met.
-        while not self.stopping_criterion(iteration, max_iterations, start_time):
+        while not stopping_criterion(
+            iteration, max_iterations, start_time, best_solution_value_list[-5:]
+        ):
             # Increment the iteration counter.
             iteration += 1
             # Get the best neighbor of the current solution.
@@ -114,7 +105,7 @@ class LocalSearch:
             best_neighbor, (best_neighbor_value, constraints) = min(
                 neighbors, key=lambda neighbor: neighbor[1][0]
             )
-            best_neighbor_is_valid = is_solution_valid(constraints)
+            best_neighbor_is_valid = self.is_solution_valid(constraints)
 
             # If the best neighbor is better than the current solution.
             if best_neighbor_value < current_solution_value:
@@ -137,7 +128,7 @@ class LocalSearch:
         elapsed_time = time() - start_time
 
         # Return the best solution.
-        return (best_solution, best_solution_value_list, iteration, elapsed_time)
+        return (best_solution, best_solution_value_list, best_solution_is_valid, iteration, elapsed_time)
 
 
 class GuidedLocalSearch(LocalSearch):
@@ -158,29 +149,66 @@ class GuidedLocalSearch(LocalSearch):
             neighborhood_size=neighborhood_size, time_limit_secs=time_limit_secs
         )
 
+    def stopping_criterion(
+        self,
+        iteration: int,
+        max_iterations: int,
+        start_time: float,
+        last_solutions: list[int | float],
+    ) -> bool:
+        """Returns whether the local search should stop or not. True means stop, False means continue."""
+
+        # At least three solutions must have been evaluated.
+        if len(last_solutions) < 3:
+            return False
+
+        # If the last 3 solutions only include the same 2 or less solutions.
+        if len(last_solutions) >= 3:
+            if len(set(last_solutions[-3:])) <= 2:
+                # print(
+                #     f"Stopped because of same solutions found in the last 4 iterations: {set(last_solutions[-3:])}"
+                # )
+                return True
+
+        # If the delta between the last five solutions is less than 1%.
+        if len(last_solutions) >= 5:
+            delta = abs(last_solutions[-1] - last_solutions[-5])
+            delta_relative = delta / abs(last_solutions[-5])
+            if delta_relative < 0.001:
+                # print("Stopped because of small delta between the last 5 solutions.")
+                return True
+
+        return super().stopping_criterion(
+            iteration, max_iterations, start_time, last_solutions
+        )
+
     def augmentation_factor(
         self,
-        properties: list[str],
+        properties: dict[str, int],
     ) -> int:
         """Augments the passed objetive function with the heuristic information"""
+
+        # pprint(self.penalties)
 
         augmentation = (
             self.llambda
             * self.alpha
-            * sum(self.penalties[prop] for prop in properties)
+            * sum(
+                self.penalties[prop]
+                for prop in properties.keys()
+                if properties[prop] > 0
+            )
         )
 
-        # Update the penalties for the properties of the found optima
-        for prop in set(properties):
-            self.penalties[prop] += 1
+        # print(augmentation)
 
         return int(augmentation)
 
     def augmented_objective_function(
         self,
         solution: Solution,
-        original_objective_function: Callable[[Solution], tuple[int, list[str]]],
-    ) -> tuple[int, list[str]]:
+        original_objective_function: Callable[[Solution], tuple[int, dict[str, int]]],
+    ) -> tuple[int, dict[str, int]]:
         """Augments the passed objetive function with the heuristic information"""
 
         value, properties = original_objective_function(solution)
@@ -195,7 +223,7 @@ class GuidedLocalSearch(LocalSearch):
         initial_solution: Solution,
         max_iterations: int,
         problem: UCTP,
-    ) -> tuple[Solution, list[int], int, float, int]:
+    ) -> tuple[Solution, list[int], bool, int, float, int]:
         """Runs the local search algorithm for the problem. Returns the best solution, the score of the solution, the number of iterations, the number of local search iterations and time elapsed."""
 
         # Start the timer
@@ -205,6 +233,8 @@ class GuidedLocalSearch(LocalSearch):
         problem.evaluate = lambda solution: self.augmented_objective_function(
             solution, original_objective_function
         )
+        # print(problem.evaluate)
+        # print(original_objective_function)
 
         iteration = 0
         local_search_iterations = 0
@@ -212,30 +242,37 @@ class GuidedLocalSearch(LocalSearch):
         current_solution = initial_solution
 
         best_solution = initial_solution
-        best_solution_value, _ = original_objective_function(best_solution)
+        best_solution_value, constraints = original_objective_function(best_solution)
         best_solution_value_list = [best_solution_value]
+        best_solution_is_valid = self.is_solution_valid(constraints)
 
-        while not self.stopping_criterion(iteration, max_iterations, start_time):
+        while not super().stopping_criterion(iteration, max_iterations, start_time, []):
             iteration += 1
 
             (
                 current_solution,
                 _current_solution_value_list,
+                current_solution_is_valid,
                 additional_local_search_iterations,
                 _time_elapsed,
-                # Running a half local search iterations
-            ) = super().search(current_solution, max_iterations // 2, problem)
-            # print("Mapped:", current_solution_value_list[-1])
-            current_solution_value, _ = original_objective_function(current_solution)
+            ) = super().search(
+                current_solution, max_iterations, problem, self.stopping_criterion
+            )
+            current_solution_value, properties = original_objective_function(
+                current_solution
+            )
+            for prop in [prop for prop, val in properties.items() if val > 0]:
+                self.penalties[prop] += 1
 
-            # print("Current:", current_solution_value)
 
             local_search_iterations += additional_local_search_iterations
 
             # Updating the best solution
             if current_solution_value < best_solution_value:
-                best_solution = current_solution
-                best_solution_value = current_solution_value
+                if not best_solution_is_valid or current_solution_is_valid:
+                    best_solution = current_solution
+                    best_solution_value = current_solution_value
+                    best_solution_is_valid = current_solution_is_valid
 
             best_solution_value_list.append(best_solution_value)
 
@@ -245,6 +282,7 @@ class GuidedLocalSearch(LocalSearch):
         return (
             best_solution,
             best_solution_value_list,
+            best_solution_is_valid,
             iteration,
             elapsed_time,
             local_search_iterations,

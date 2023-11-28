@@ -1,19 +1,115 @@
 ---
-title: "Guided Local Search (GLS)"
-author: "Henrique Coutinho Layber"
-format:
-    html:
-        code-fold: true
-execute:
-  echo: true
-jupyter: python3
+title: Guided Local Search (GLS)
+author: Henrique Coutinho Layber
+date: 2023-11-28
+institute: Universidade Federal do Espírito Santo
+abstract: 
+    "Neste trabalho, apresentamos a metaheurística Guided Local Search (GLS) para o problema University Course Timetabling Problem (UCTP). A metaheurística GLS é baseada em busca local, e utiliza uma função de penalidade para guiar a busca, de forma a evitar que a busca fique presa em ótimos locais. Apresentamos a implementação da metaheurística, e realizamos uma análise de seu desempenho, comparando com a metaheurística Local Search (LS). Os resultados computacionais mostram que a metaheurística GLS é capaz de encontrar soluções melhores que a metaheurística LS, em um tempo de execução similar."
+format: 
+    beamer:
+        echo: false
+        # warning: false
 ---
 
-For a comparison of the local search algorithms, see @local-search-comparison.
+- Introdução (revisão da metaheurística)
+- Implementação
+    - Representação das soluções
+    - Geração de solução inicial
+    - Análise de vizinhança
+    - Classificação de soluções
+    - Critério de parada
+- Análise
+- Resultados computacionais
+
+# O que é GLS?
+
+::: {.incremental}
+
+- Metaheurística baseada em busca local
+- Utiliza uma função de penalidade para guiar a busca
+:::
+
+---
+
+$$
+\mathcal{g}(x) = \mathcal{f}(x) + \lambda \alpha \sum_{i=1}^{M} I_i p_i
+$$
+
+
+# Implementação
+## Representação da solução
+
+\includegraphics{../assets/solution_repr.png}
+
+---
+
+\includegraphics{../assets/solution_to_graph.png}
+
+---
+
+## Geração de solução inicial
+
+\includegraphics{../assets/random_solution.png}
+
+---
+
+## Análise de vizinhança
+
+### Lecture Move
+
+\includegraphics{../assets/lecture_move.png}
+
+---
+
+### Selecionar índices válidos
+
+\includegraphics{../assets/valid_indexes.png}
+
+---
+
+### Vizinhança
+
+\includegraphics{../assets/neighbors.png}
+
+---
+
+## Classificação de soluções
+
+### Carregamento em estruturas amigáveis
+
+\includegraphics{../assets/load_friendly_structures.png}
+
+---
+
+### Avaliação
+
+\includegraphics{../assets/evaluation.png}
+
+---
+
+
+## Critério de parada
+
+### Local search
+
+
+\includegraphics{../assets/local_search_stop.png}
+
+---
+
+### Guided local search
+
+\includegraphics{../assets/guided_local_search_stop.png}
+
+---
+
+# Comparações
+
+## LS vs GLS
 
 ```{python}
 # | label: local-search-comparison
-# | fig-cap: "Results for running the heuristics on comp03.ctt"
+# | fig-cap: "Resultado das heurística sobre `comp03.ctt`"
 
 with open("../../instances/test/comp03.ctt", "r") as file:
     instance = file.readlines()
@@ -31,11 +127,11 @@ def run_algo(
     initial_solution: Solution,
     problem: UCTP = problem,
     iterations: int = 1000,
-) -> tuple[float, float]:
+) -> tuple[float, float, bool]:
     """Runs the local search algorithm for the problem, starting from a random solution. Returns the best solution, the score of the solution, the number of iterations and time elapsed."""
     search = algo.search(initial_solution, iterations, problem)
 
-    return (search[1], search[3])
+    return (search[1], search[3], search[2])
 
 
 # Capture solutions over iter
@@ -44,12 +140,13 @@ import sys
 from collections import defaultdict
 
 times_to_run = 5
-time_limit_secs = 600
+time_limit_secs = 72
 neighborhood_size = 10
 iterations = 30000
-llambda = 0.3
+llambda = 0.8
 alpha = 1
 
+solutions_are_valid = defaultdict(list)
 algo_solutions = defaultdict(list)
 algo_times = defaultdict(list)
 algos = {
@@ -74,32 +171,22 @@ with futures.ProcessPoolExecutor() as executor:
                 executor.submit(run_algo, algo, initial_solution, iterations=iterations)
             ] = algo_name
 
-    for future in futures.as_completed(future_result):
-        # print(f"Round {future_result[future]} finished")
-        try:
-            solutions, total_time = future.result()
-            algo_name = future_result[future]
-        except Exception as exc:
-            print(f"Future generated an exception: {exc}", file=sys.stderr)
-        else:
-            algo_solutions[algo_name].append(solutions)
-            mean_time = total_time / len(solutions)
-            algo_times[algo_name].append(mean_time)
-
-# means_solutions = {
-#     algo_name: [
-#         sum(x) / len(x)
-#         for algo_name, algo_iter_solutions in algo_solutions.items()
-#         for x in zip(*algo_iter_solutions)
-#     ]
-# }
+for future in futures.as_completed(future_result):
+    # print(f"Round {future_result[future]} finished")
+    try:
+        solutions, total_time, solution_is_valid = future.result()
+    except Exception as exc:
+        print(f"Future generated an exception: {exc}", file=sys.stderr)
+    else:
+        algo_name = future_result[future]
+        algo_solutions[algo_name].append((solutions, solution_is_valid))
+        mean_time = total_time / len(solutions)
+        algo_times[algo_name].append(mean_time)
 
 means_times_per_iter = {
     algo_name: sum(algo_times) / len(algo_times)
     for algo_name, algo_times in algo_times.items()
 }
-
-print(means_times_per_iter)
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -107,7 +194,7 @@ import matplotlib.pyplot as plt
 sns.set_theme(style="darkgrid")
 plt.xlabel("Iterations")
 plt.ylabel("Score")
-plt.title("Results for running the metaheuristics on comp03.ctt")
+# plt.title("Results for running the metaheuristics on comp03.ctt")
 
 
 colors = {
@@ -119,29 +206,41 @@ labels = {}
 
 for algo_name, solutions in algo_solutions.items():
     # Plot only the best solution list (the one in which the last item is the smallest)
-    solution = min(solutions, key=lambda x: x[-1])
+    solution = min(solutions, key=lambda x: x[0][-1])
+    solution_is_valid = solution[1]
+    solution = solution[0]
+    # if not solution_is_valid:
+    #     print(f"{algo_name} found an invalid solution")
 
-    # Horizontal line for the best solution
-    # Also write it on y axis
-    # plt.text(
-    #     0,
-    #     solution[-1],
-    #     f"{solution[-1]}",
-    #     horizontalalignment="right",
-    #     verticalalignment="center",
-    #     color=colors[algo_name],
-    # )
-    # Replace with plt.annotate
-    # plt.annotate(value_text, xy=(constant_y, constant_y), xytext=(constant_y, constant_y + 5),
-    #  arrowprops=dict(facecolor='black', shrink=0.05))
     constant_y = solution[-1]
+    # Horizontal line for the best solution
     plt.axhline(y=constant_y, color=colors[algo_name], linestyle=(0, (1, 10)))
-    plt.annotate(
-        f"{solution[-1]}",
-        xy=(0, constant_y),
-        xytext=(0, constant_y),
+    # Also write it on y axis
+    plt.text(
+        0,
+        constant_y,
+        f"{constant_y}",
+        horizontalalignment="right",
+        verticalalignment="center",
         color=colors[algo_name],
     )
+
+    if solution_is_valid:
+        # Place a green check on the last point
+        plt.scatter(
+            len(solution) - 1,
+            solution[-1],
+            marker="v",
+            color="green",
+        )
+    else:
+        # Place a red X on the last point
+        plt.scatter(
+            len(solution) - 1,
+            solution[-1],
+            marker="x",
+            color="red",
+        )
 
     # print(solution)
 
@@ -158,7 +257,315 @@ plt.legend(
     title="Algorithms",
 )
 
-plt.show()
 
+plt.show()
+```
+
+---
+
+## LS vs GLS vs Best Known
+
+```{python}
+# | label: local-search-comparison-best
+# | fig-cap: "Resultado das heurística sobre `comp03.ctt`, com o melhor tempo conhecido"
+
+sns.set_theme(style="darkgrid")
+plt.xlabel("Iterations")
+plt.ylabel("Score")
+# plt.title("Results for running the metaheuristics on comp03.ctt")
+
+
+colors = {
+    "Local Search": "blue",
+    "Guided Local Search": "green",
+}
+
+labels = {}
+for algo_name, solutions in algo_solutions.items():
+    # Plot only the best solution list (the one in which the last item is the smallest)
+    solution = min(solutions, key=lambda x: x[0][-1])
+    solution_is_valid = solution[1]
+    solution = solution[0]
+    # if not solution_is_valid:
+    #     print(f"{algo_name} found an invalid solution")
+
+    constant_y = solution[-1]
+    # Horizontal line for the best solution
+    plt.axhline(y=constant_y, color=colors[algo_name], linestyle=(0, (1, 10)))
+    # Also write it on y axis
+    plt.text(
+        0,
+        constant_y,
+        f"{constant_y}",
+        horizontalalignment="right",
+        verticalalignment="center",
+        color=colors[algo_name],
+    )
+
+    if solution_is_valid:
+        # Place a green check on the last point
+        plt.scatter(
+            len(solution) - 1,
+            solution[-1],
+            marker="v",
+            color="green",
+        )
+    else:
+        # Place a red X on the last point
+        plt.scatter(
+            len(solution) - 1,
+            solution[-1],
+            marker="x",
+            color="red",
+        )
+
+    # print(solution)
+
+    if algo_name not in labels:
+        labels[algo_name] = plt.plot(solution, label=algo_name, color=colors[algo_name])
+    else:
+        plt.plot(solution, color=colors[algo_name])
+
+plt.legend(
+    bbox_to_anchor=(1, 1),
+    fancybox=True,
+    shadow=True,
+    ncol=1,
+    title="Algorithms",
+)
+
+
+best_known_comp03 = 64
+best_known_color = "red"
+# Draw line for optimal solution
+plt.axhline(y=best_known_comp03, color=best_known_color, linestyle=(0, (1, 10)))
+# Also write it on y axis
+plt.text(
+    0,
+    best_known_comp03,
+    f"{best_known_comp03}",
+    horizontalalignment="right",
+    verticalalignment="center",
+    color=best_known_color,
+)
+plt.show()
+```
+
+
+---
+
+## Tempo por iteração
+
+```{python}
+for algo_name, mean_time in means_times_per_iter.items():
+    print(f"{algo_name}: {mean_time*1000:.2f}ms")
+```
+
+# Resultados computacionais
+
+```{python}
+
+problem_optimal = {
+    "comp01.ctt": 5,
+    "comp02.ctt": 24,
+    "comp03.ctt": 64,
+    "comp04.ctt": 35,
+    "comp05.ctt": 284,
+    "comp06.ctt": 27,
+    "comp07.ctt": 6,
+    "comp08.ctt": 37,
+    "comp09.ctt": 96,
+    "comp10.ctt": 4,
+    "comp11.ctt": 0,
+    "comp12.ctt": 294,
+    "comp13.ctt": 59,
+    "comp14.ctt": 51,
+    "comp15.ctt": 62,
+    "comp16.ctt": 18,
+    "comp17.ctt": 56,
+    "comp18.ctt": 61,
+    "comp19.ctt": 57,
+    "comp20.ctt": 4,
+    "comp21.ctt": 74,
+    "toy.ctt": 2,
+}
+
+times_to_run = 0
+time_limit_secs = 72
+neighborhood_size = 10
+iterations = 30000
+llambda = 0.8
+alpha = 1
+
+if times_to_run > 0:
+    import os
+
+    for file_name in os.listdir("../../instances/test/"):
+        with open(f"../../instances/test/{file_name}", "r") as file:
+            instance = file.readlines()
+
+        # Open an instance of the UCTP
+        from gls_uctp.uctp.model import UCTP, Solution
+
+        problem = UCTP.parse(instance)
+
+        from gls_uctp.local_search.local_search import LocalSearch, GuidedLocalSearch
+
+        def run_algo(
+            algo: LocalSearch,
+            initial_solution: Solution,
+            problem: UCTP = problem,
+            iterations: int = 1000,
+        ) -> tuple[float, float, bool]:
+            """Runs the local search algorithm for the problem, starting from a random solution. Returns the best solution, the score of the solution, the number of iterations and time elapsed."""
+            search = algo.search(initial_solution, iterations, problem)
+
+            return (search[1], search[3], search[2])
+
+        # Capture solutions over iter
+        import concurrent.futures as futures
+        import sys
+        from collections import defaultdict
+
+        solutions_are_valid = defaultdict(list)
+        algo_solutions = defaultdict(list)
+        algo_times = defaultdict(list)
+        algos = {
+            # "Local Search": LocalSearch(
+            #     neighborhood_size=neighborhood_size, time_limit_secs=time_limit_secs
+            # ),
+            "Guided Local Search": GuidedLocalSearch(
+                neighborhood_size=neighborhood_size,
+                time_limit_secs=time_limit_secs,
+                llambda=llambda,
+                alpha=alpha,
+            ),
+        }
+
+        with futures.ProcessPoolExecutor() as executor:
+            future_result = {}
+            for i in range(times_to_run):
+                initial_solution = problem.random_solution()
+
+                for algo_name, algo in algos.items():
+                    future_result[
+                        executor.submit(
+                            run_algo, algo, initial_solution, iterations=iterations
+                        )
+                    ] = algo_name
+
+        for future in futures.as_completed(future_result):
+            # print(f"Round {future_result[future]} finished")
+            try:
+                solutions, total_time, solution_is_valid = future.result()
+            except Exception as exc:
+                print(f"Future generated an exception: {exc}", file=sys.stderr)
+            else:
+                algo_name = future_result[future]
+                algo_solutions[algo_name].append((solutions, solution_is_valid))
+                mean_time = total_time / len(solutions)
+                algo_times[algo_name].append(mean_time)
+
+        from math import inf
+        import sys
+
+        # gls_times = algo_times["Guided Local Search"]
+        gls_solutions = [
+            solution[-1] for solution, is_valid in algo_solutions["Guided Local Search"]
+        ]
+        from pprint import pprint
+
+        pprint(gls_solutions)
+        instance_optimal = problem_optimal[file_name]
+
+        min_gls = min(gls_solutions)
+        mean_solution = sum(gls_solutions) / len(gls_solutions)
+        if instance_optimal == 0 and min_gls != 0:
+            min_solution_gap = inf
+            mean_solution_gap = inf
+        else:
+            min_solution_gap = (min_gls - instance_optimal) / instance_optimal
+            mean_solution_gap = (mean_solution - instance_optimal) / instance_optimal
+        with open("results.txt", "a") as file:
+            file.write(f"{file_name} Min_5: {min_gls}\n")
+            file.write(f"{file_name} Media_5: {mean_solution}\n")
+            file.write(f"{file_name} gap_min: {min_solution_gap}\n")
+            file.write(f"{file_name} gap_media: {mean_solution_gap}\n")
 
 ```
+
+\begin{table}[ht]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}\hline
+            & \'Otimo            & \multicolumn{2}{c|}{$f_{GLS}$}   & \multicolumn{2}{|c|}{Gaps}            \\\hline 
+Inst\^ancia & $f_{\mbox{ótimo}}$ & $Min_{5}$ & $\mbox{M\'edia}_{5}$ & $gap_{Min} $ & $gap_{\mbox{M\'edia}}$ \\\hline
+comp01      & 5                  & 1291      & 1389.8               & 257.2        & 276.96                 \\\hline
+comp02      & 24                 & 6165      & 6641.2               & 6165         & 6641.2                 \\\hline
+comp03      & 64                 & 4576      & 4972.0               & 4576         & 4972.0                 \\\hline
+comp04      & 35                 & 4538      & 4823.6               & 4538         & 4823.6                 \\\hline
+comp05      & 284                & 4747      & 7068.0               & 4747         & 7068.0                 \\\hline
+comp06      & 27                 & 5483      & 6037.8               & 5483         & 6037.8                 \\\hline
+comp07      & 6                  & 5393      & 5623.2               & 5393         & 5623.2                 \\\hline
+comp08      & 37                 & 4399      & 4700.6               & 4399         & 4700.6                 \\\hline
+comp09      & 96                 & 4471      & 4642.0               & 4471         & 4642.0                 \\\hline
+comp10      & 4                  & 4187      & 5146.0               & 4187         & 5146.0                 \\\hline
+\end{tabular}                                        
+\end{center}
+\caption{Resultados -- GLS} \label{table:results}
+\end{table}
+
+---
+
+\begin{table}[ht]
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}\hline
+            & \'Otimo            & \multicolumn{2}{c|}{$f_{GLS}$}   & \multicolumn{2}{|c|}{Gaps}            \\\hline 
+Inst\^ancia & $f_{\mbox{ótimo}}$ & $Min_{5}$ & $\mbox{M\'edia}_{5}$ & $gap_{Min} $ & $gap_{\mbox{M\'edia}}$ \\\hline
+comp11      & 0                  & 1373      & 1436.8               & inf          & inf                    \\\hline
+comp12      & 294                & 2342      & 2629.8               & 2342         & 2629.8                 \\\hline
+comp13      & 59                 & 5558      & 6277.6               & 5558         & 6277.6                 \\\hline
+comp14      & 51                 & 2817      & 3087.6               & 2817         & 3087.6                 \\\hline
+comp15      & 62                 & 5062      & 5279.4               & 5062         & 5279.4                 \\\hline
+comp16      & 18                 & 4660      & 5181.6               & 4660         & 5181.6                 \\\hline
+comp17      & 56                 & 4756      & 5266.6               & 4756         & 5266.6                 \\\hline
+comp18      & 61                 & 1054      & 1154.2               & 1054         & 1154.2                 \\\hline
+comp19      & 57                 & 2901      & 4108.8               & 2901         & 4108.8                 \\\hline
+comp20      & 4                  & 6143      & 7367.6               & 6143         & 7367.6                 \\\hline
+comp21      & 74                 & 4288      & 5004.6               & 4288         & 5004.6                 \\\hline
+\end{tabular}                                        
+\end{center}
+\caption{Resultados -- GLS} \label{table:results}
+\end{table}
+
+
+# Conclusões
+
+Implementação não satisfatória
+
+::: {.incremental}
+
+- Pouco parâmetros é muito bom
+- Fácil de hibridizar
+- GLS é capaz de encontrar soluções melhores que LS (mesmo na minha implementação, o que é incrível)
+
+:::
+
+---
+
+## Utilidade
+$$
+util(s_*, i) = I_{i(s_*)} \frac{c_i}{1 + p_i}
+$$
+
+---
+
+## Melhorias
+
+::: {.incremental}
+
+- Utilizar a função de utilidade pra evitar superpenalização de _features_ que podem ser boas no futuro
+- Melhorias na performance da função de avaliação
+- Melhorias na performance do código em geral (_yield_, etc.)
+- **Melhorias na geração da solução inicial**
+
+:::

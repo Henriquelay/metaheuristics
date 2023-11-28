@@ -182,7 +182,7 @@ class UCTP:
         )
         self.teachers = list({course.teacher for course in self.courses})
 
-        self.weights: Weights = ((10, 10, 10, 10), (1, 5, 2, 1))
+        self.weights: Weights = ((0, 0, 0, 0), (1, 5, 2, 1))
 
     def __str__(self) -> str:
         return f"""UCTP(\
@@ -380,7 +380,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
     def evaluate_dict(
         self,
         solution_dict: dict[str, list[tuple[str, int, int]]],
-    ) -> tuple[float, list[str]]:
+    ) -> tuple[float, dict[str, int]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
         graph = self.solution_to_graph(solution_dict)
         return self.evaluate(graph)
@@ -388,7 +388,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
     def evaluate(
         self,
         solution: Solution,
-    ) -> tuple[int, list[str]]:
+    ) -> tuple[int, dict[str, int]]:
         """Evaluates a graph solution for UCTP and returns a score for the weighted number of rule violations. Returns the score."""
 
         # List of Rooms and timeslots assigned to each course
@@ -435,7 +435,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 for curriculum in curricula:
                     curriculum_timeslots[curriculum.name].append((day, period))
 
-        properties: list[str] = []
+        properties: dict[str, int] = defaultdict(int)
 
         score = 0
 
@@ -446,7 +446,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             # if some lecture is not allocated, then there is a violation
             if len(periods) < course.lectures:
                 score += self.weights[0][0] * (course.lectures - len(periods))
-                properties.append("H1")
+                properties["H1"] += 1
 
             # if lectures are allocated in the same period, then there is a violation
             periods_stripped_room = [(day, period) for _, day, period in periods]
@@ -454,7 +454,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                 len(periods_stripped_room) - len(set(periods_stripped_room))
             )
             if len(periods_stripped_room) != len(set(periods_stripped_room)):
-                properties.append("H1")
+                properties["H1"] += 1
 
             # H4 - Unavailability: If a course is assigned to slot that it is unavailable, It is a violation.
             constraints = {
@@ -463,30 +463,30 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             intersection = constraints.intersection(set(periods_stripped_room))
             score += self.weights[0][3] * len(intersection)
             if len(intersection) > 0:
-                properties.append("H4")
+                properties["H4"] += 1
 
             # S2 - Minimum working days: The number of days where at least one lecture is scheduled must be greater or equal than the minimum working days of the course. Each day below the minimum is a violation.
             days = {day for day, _ in periods_stripped_room}
             if len(days) < course.min_working_days:
                 score += self.weights[1][1] * (course.min_working_days - len(days))
-                properties.append("S2")
+                properties["S2"] += 1
 
             # S4 - Room stability: All lectures of a course must be allocated in the same room. Each lecture not allocated in the same room is a violation.
             rooms_of_lecture = len({room for room, _, _ in periods})
             score += self.weights[1][3] * (rooms_of_lecture - 1)
             if rooms_of_lecture > 1:
-                properties.append("S4")
+                properties["S4"] += 1
 
         # H3 - Conflits: Lectures of courses in the same curriculum, or teached by the same teacher must be allocated in different periods. Each lecture allocated in the same period is a violation.
         for periods in teacher_timeslots.values():
             score += self.weights[0][2] * (len(periods) - len(set(periods)))
             if len(periods) != len(set(periods)):
-                properties.append("H3")
+                properties["H3"] += 1
 
         for periods in curriculum_timeslots.values():
             score += self.weights[0][2] * (len(periods) - len(set(periods)))
             if len(periods) != len(set(periods)):
-                properties.append("H3")
+                properties["H3"] += 1
 
             # S3 - Curriculum compactness: All lectures of a curriculum must have as few isolated lectures as possible. Each lecture that is not adjacent to another lecture in the same curriculum is a violation.
             in_gap = False
@@ -503,7 +503,7 @@ Constraints = {[v.__str__() for v in self.constraints]}\
                     elif period > last_period + 1 and in_gap:
                         # Last period was a gap, and this is a gap too, so it's a violation
                         score += self.weights[1][2]
-                        properties.append("S3")
+                        properties["S3"] += 1
                     else:
                         in_gap = False
                 last_period = period
@@ -514,12 +514,12 @@ Constraints = {[v.__str__() for v in self.constraints]}\
             rooms = [room for room, _ in room_courses]
             score += self.weights[0][1] * (len(rooms) - len(set(rooms)))
             if len(rooms) != len(set(rooms)):
-                properties.append("H2")
+                properties["H2"] += 1
 
             # S1 - Room capacity: The number of students in a room-period can't exceed the capacity of the room. Each student over the capacity is a violation.
             for room, course in room_courses:
                 if course.students > room.capacity:
                     score += self.weights[1][0] * (course.students - room.capacity)
-                    properties.append("S1")
+                    properties["S1"] += 1
 
         return (score, properties)
