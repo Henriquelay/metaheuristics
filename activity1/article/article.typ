@@ -105,10 +105,7 @@ Depois da primeira ótima local e toda ótima subsequente, o algoritmo toma a a�
 
 #let cost_set = math.bold("c")
 
-As fontes de informações são os custos das propriedades e a própria ótima local. Assuma que cada propriedade $i$ definida sobre o conjunto de soluções $S$ é atribuído um custo $c_i$. Esse custo pode ser constante ou variável. Para simplificar a nossa análise, considere os custos constantes e dado pelo _vetor de custos_ #cost_set:
-
-$ #cost_set = (c_1, dots, c_M)", " c_i in NN $
-
+As fontes de informações são os custos das propriedades e a própria ótima local. Assuma que cada propriedade $i$ definida sobre o conjunto de soluções $S$ é atribuído um custo $c_i$. Esse custo pode ser constante ou variável. Para simplificar a nossa análise, considere os custos constantes e dado pelo _vetoalgorithm
 Uma solução ótima particular $s*$ exibe um número de propriedades. Indicadores $I_i$ das propriedades $i$ exibidas tomam o valor de $1$. Ou seja: para uma propriedade $i$ exibida por $s*$, $I_i(s*) = 1$.
 
 == Modificações de penalidade
